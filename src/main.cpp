@@ -153,34 +153,34 @@ void applicationTask(void* pvParameters) {
                 messageReceived = false;
                 int len = 0;
                 if (loramesh.mydd.devtype == DEV_TYPE_ROUTER) {
-                    if(loramesh.parsePacket(0)){
+                    if(loramesh.receivePacket()){
                         if (actualslot == END_DEVICE_1_SLOT) {
-                            while(loramesh.available() && len < BUFFER_SIZE - 1){
-                                rxpacket[len++] = (char) loramesh.read();
-                            }
-                            log_i("Resposta do End Device 1 recebida no slot 1: %d %d %d %d", rxpacket[0], rxpacket[1], rxpacket[2], rxpacket[3]);
-                            rxpacket[0] = 0;
-                            rxpacket[1] = 0; 
-                            rxpacket[2] = 0;
-                            rxpacket[3] = 0;
+                            // while(loramesh.available() && len < BUFFER_SIZE - 1){
+                            //     rxpacket[len++] = (char) loramesh.read();
+                            // }
+                            log_i("Resposta do End Device 1 recebida no slot 1: %d %d %d %d", loramesh.lastpkt.rxpacket[0],loramesh.lastpkt.rxpacket[1],loramesh.lastpkt.rxpacket[2],loramesh.lastpkt.rxpacket[3]);
+                            // rxpacket[0] = 0;
+                            // rxpacket[1] = 0; 
+                            // rxpacket[2] = 0;
+                            // rxpacket[3] = 0;
                           
-                        }else if (actualslot == END_DEVICE_2_SLOT) {
+                        }else {
                             // Processe resposta do End Device 2
-                            while(loramesh.available() && len < BUFFER_SIZE - 1){
-                                rxpacket[len++] = (char) loramesh.read();
-                            }
-                            //log_i("teste");
-                            log_i("Resposta do End Device 2 recebida no slot 2: %d %d %d %d\n", rxpacket[0], rxpacket[1], rxpacket[2], rxpacket[3]);
-                            rxpacket[0] = 0;
-                            rxpacket[1] = 0; 
-                            rxpacket[2] = 0;
-                            rxpacket[3] = 0;
+                            // while(loramesh.available() && len < BUFFER_SIZE - 1){
+                            //     rxpacket[len++] = (char) loramesh.read();
+                            // }
+                            
+                            log_i("Resposta do End Device 2 recebida no slot 2: %d %d %d %d", loramesh.lastpkt.rxpacket[0],loramesh.lastpkt.rxpacket[1],loramesh.lastpkt.rxpacket[2],loramesh.lastpkt.rxpacket[3]);
+                            // rxpacket[0] = 0;
+                            // rxpacket[1] = 0; 
+                            // rxpacket[2] = 0;
+                            // rxpacket[3] = 0;
                         
+                        }
                         setindpolls();
                         lastActivityMillis = millis();
                         // nextstate = ST_STANDBY; que estado é esse??
                         nextstate = ST_TXBEACON;
-                        }
                     }
                 }else{
                     if (loramesh.receivePacket()) {
@@ -297,6 +297,7 @@ void setup() {
     #endif
 
     Serial.printf("\nMemoria livre antes de criar tarefas: %u bytes\n", ESP.getFreeHeap());
+    
 
     // CORREÇÃO: Pilhas com tamanhos seguros para evitar crashes
     xTaskCreatePinnedToCore(applicationTask, "ApplicationTask", 4096, NULL, 3, &App_TaskHandle, 1);
