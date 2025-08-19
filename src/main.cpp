@@ -153,7 +153,9 @@ void applicationTask(void* pvParameters) {
                 messageReceived = false;
                 int len = 0;
                 if (loramesh.mydd.devtype == DEV_TYPE_ROUTER) {
+                    //Serial.println(loramesh.receivePacket());
                     if(loramesh.receivePacket()){
+                        Serial.println("teste");
                         if (actualslot == END_DEVICE_1_SLOT) {
                             // while(loramesh.available() && len < BUFFER_SIZE - 1){
                             //     rxpacket[len++] = (char) loramesh.read();
