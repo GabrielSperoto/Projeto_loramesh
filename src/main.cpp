@@ -43,10 +43,12 @@ bool syncronized = false;
 
 #define END_DEVICE_1_SLOT 1
 #define END_DEVICE_2_SLOT 2
+#define END_DEVICE_3_SLOT 3
 
 // Frames de dados que os End Devices devem enviar
 uint8_t msg_device1[] = {10, 20, 30, 40};
 uint8_t msg_device2[] = {50, 60, 70, 80};
+uint8_t msg_device3[] = {20,70,40,10};
 
 uint32_t previous_FR = 0;
 uint32_t current_FR = 0;
@@ -95,7 +97,7 @@ void slottimecontrol() {
         lastscantime_ms += currscantime_ms;
         actualslot++;
 
-        if (actualslot >= MAX_SLOTS) {
+        if (actualslot > MAX_SLOTS) {
             actualslot = 0;
             if (loramesh.mydd.devtype == DEV_TYPE_ROUTER)
                 nextstate = ST_TXBEACON;
@@ -149,40 +151,54 @@ void applicationTask(void* pvParameters) {
             }
             break;
         case ST_RXWAIT:
+        // Serial.print("Message received: ");
+        // Serial.println(messageReceived);
             if (messageReceived){
                 messageReceived = false;
                 int len = 0;
                 if (loramesh.mydd.devtype == DEV_TYPE_ROUTER) {
-                    //Serial.println(loramesh.receivePacket());
-                    if(loramesh.receivePacket()){
-                        Serial.println("teste");
+                    // Serial.println(loramesh.parsePacket(0));
+                    if(loramesh.parsePacket(0)){
+                        // log_i("actualslot: %d",actualslot);
                         if (actualslot == END_DEVICE_1_SLOT) {
-                            // while(loramesh.available() && len < BUFFER_SIZE - 1){
-                            //     rxpacket[len++] = (char) loramesh.read();
-                            // }
-                            log_i("Resposta do End Device 1 recebida no slot 1: %d %d %d %d", loramesh.lastpkt.rxpacket[0],loramesh.lastpkt.rxpacket[1],loramesh.lastpkt.rxpacket[2],loramesh.lastpkt.rxpacket[3]);
-                            // rxpacket[0] = 0;
-                            // rxpacket[1] = 0; 
-                            // rxpacket[2] = 0;
-                            // rxpacket[3] = 0;
+                            while(loramesh.available() && len < BUFFER_SIZE - 1){
+                                rxpacket[len++] = (char) loramesh.read();
+                            }
+                            log_i("Resposta do End Device 1 recebida no slot 1: %d %d %d %d", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3]);
+                            rxpacket[0] = 0;
+                            rxpacket[1] = 0; 
+                            rxpacket[2] = 0;
+                            rxpacket[3] = 0;
                           
-                        }else {
+                        }if(actualslot == END_DEVICE_2_SLOT){
                             // Processe resposta do End Device 2
-                            // while(loramesh.available() && len < BUFFER_SIZE - 1){
-                            //     rxpacket[len++] = (char) loramesh.read();
-                            // }
+                            while(loramesh.available() && len < BUFFER_SIZE - 1){
+                                rxpacket[len++] = (char) loramesh.read();
+                            }
                             
-                            log_i("Resposta do End Device 2 recebida no slot 2: %d %d %d %d", loramesh.lastpkt.rxpacket[0],loramesh.lastpkt.rxpacket[1],loramesh.lastpkt.rxpacket[2],loramesh.lastpkt.rxpacket[3]);
-                            // rxpacket[0] = 0;
-                            // rxpacket[1] = 0; 
-                            // rxpacket[2] = 0;
-                            // rxpacket[3] = 0;
+                            log_i("Resposta do End Device 2 recebida no slot 2: %d %d %d %d", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3]);
+                            rxpacket[0] = 0;
+                            rxpacket[1] = 0; 
+                            rxpacket[2] = 0;
+                            rxpacket[3] = 0;
+                        
+                        }
+                        if(actualslot == END_DEVICE_3_SLOT){
+                            // Processe resposta do End Device 3
+                            while(loramesh.available() && len < BUFFER_SIZE - 1){
+                                rxpacket[len++] = (char) loramesh.read();
+                            }
+                            
+                            log_i("Resposta do End Device 3 recebida no slot 3: %d %d %d %d", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3]);
+                            rxpacket[0] = 0;
+                            rxpacket[1] = 0; 
+                            rxpacket[2] = 0;
+                            rxpacket[3] = 0;
                         
                         }
                         setindpolls();
                         lastActivityMillis = millis();
                         // nextstate = ST_STANDBY; que estado é esse??
-                        nextstate = ST_TXBEACON;
                     }
                 }else{
                     if (loramesh.receivePacket()) {
@@ -193,11 +209,11 @@ void applicationTask(void* pvParameters) {
 
                            log_i("Rx.seqnum: %d",loramesh.lastpkt.seqnum);
                             
-                        //    #if DISPLAY_ENABLE
-                        //    char display_line4[20]; 
-                        //    sprintf(display_line4,"Tx.seqnun: %d",loramesh.lastpkt.seqnum);
-                        //    Heltec.DisplayShowAll(display_line1,display_line2,display_line4);
-                        //    #endif
+                           #if DISPLAY_ENABLE
+                           char display_line4[20]; 
+                           sprintf(display_line4,"Tx.seqnun: %d",loramesh.lastpkt.seqnum);
+                           Heltec.DisplayShowAll(display_line1,display_line2,display_line4);
+                           #endif
 
                         }
                         nextstate = ST_TXDATA; 
@@ -237,9 +253,13 @@ void sendTask(void* pvParameters) {
                 if (loramesh.mydd.dataslot == END_DEVICE_1_SLOT) {
                     msg = msg_device1;
                     msg_size = sizeof(msg_device1);
-                } else {
+                }else if (loramesh.mydd.dataslot == END_DEVICE_2_SLOT) {
                     msg = msg_device2;
                     msg_size = sizeof(msg_device2);
+                }
+                 else if(loramesh.mydd.dataslot == END_DEVICE_3_SLOT) {
+                    msg = msg_device3;
+                    msg_size = sizeof(msg_device3);
                 }
             
                 loramesh.sendPacket(msg, msg_size);
