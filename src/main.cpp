@@ -158,43 +158,37 @@ void applicationTask(void* pvParameters) {
                 int len = 0;
                 if (loramesh.mydd.devtype == DEV_TYPE_ROUTER) {
                     // Serial.println(loramesh.parsePacket(0));
-                    if(loramesh.parsePacket(0)){
-                        // log_i("actualslot: %d",actualslot);
-                        if (actualslot == END_DEVICE_1_SLOT) {
-                            while(loramesh.available() && len < BUFFER_SIZE - 1){
-                                rxpacket[len++] = (char) loramesh.read();
-                            }
-                            log_i("Resposta do End Device 1 recebida no slot 1: %d %d %d %d", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3]);
-                            rxpacket[0] = 0;
-                            rxpacket[1] = 0; 
-                            rxpacket[2] = 0;
-                            rxpacket[3] = 0;
-                          
-                        }if(actualslot == END_DEVICE_2_SLOT){
-                            // Processe resposta do End Device 2
-                            while(loramesh.available() && len < BUFFER_SIZE - 1){
-                                rxpacket[len++] = (char) loramesh.read();
-                            }
-                            
-                            log_i("Resposta do End Device 2 recebida no slot 2: %d %d %d %d", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3]);
-                            rxpacket[0] = 0;
-                            rxpacket[1] = 0; 
-                            rxpacket[2] = 0;
-                            rxpacket[3] = 0;
-                        
-                        }
-                        if(actualslot == END_DEVICE_3_SLOT){
-                            // Processe resposta do End Device 3
-                            while(loramesh.available() && len < BUFFER_SIZE - 1){
-                                rxpacket[len++] = (char) loramesh.read();
-                            }
-                            
-                            log_i("Resposta do End Device 3 recebida no slot 3: %d %d %d %d", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3]);
-                            rxpacket[0] = 0;
-                            rxpacket[1] = 0; 
-                            rxpacket[2] = 0;
-                            rxpacket[3] = 0;
-                        
+                    // log_i("%d",loramesh.receivePacket());
+                        if (loramesh.receivePacket()) {
+                            uint8_t sender_address = loramesh.lastpkt.srcaddress;
+                            uint8_t* rxpacket = loramesh.lastpkt.rxpacket; // Usa o buffer da própria loramesh
+
+                            // Verifica qual dispositivo enviou a mensagem pelo endereço de origem
+                            switch (sender_address) {
+                                case 2: // Endereço do End Device 1, conforme devid[] em Loramesh.cpp
+                                    if (actualslot != END_DEVICE_1_SLOT) {
+                                        log_w("Alerta: Pacote do End Device 1 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
+                                    }
+                                    log_i("Resposta do End Device 1 recebida no slot %d: %d", actualslot, rxpacket[0]);
+                                    break;
+
+                                case 3: // Endereço do End Device 2
+                                    if (actualslot != END_DEVICE_2_SLOT) {
+                                        log_w("Alerta: Pacote do End Device 2 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
+                                    }
+                                    log_i("Resposta do End Device 2 recebida no slot %d: %d", actualslot, rxpacket[0]);
+                                    break;
+
+                                case 4: // Endereço do End Device 3
+                                    if (actualslot != END_DEVICE_3_SLOT) {
+                                        log_w("Alerta: Pacote do End Device 3 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
+                                    }
+                                    log_i("Resposta do End Device 3 recebida no slot %d: %d", actualslot, rxpacket[0]);
+                                    break;
+
+                                default:
+                                    log_w("Recebido pacote de um endereço desconhecido: %d", sender_address);
+                                    break;
                         }
                         setindpolls();
                         lastActivityMillis = millis();
@@ -262,7 +256,8 @@ void sendTask(void* pvParameters) {
                     msg_size = sizeof(msg_device3);
                 }
             
-                loramesh.sendPacket(msg, msg_size);
+                //envia o pacote para o router (dstaddress = 1)
+                loramesh.sendPacketRes(1, msg[0]);
                 lastActivityMillis = millis();
                 Serial.println("Mensagem enviada");
 
