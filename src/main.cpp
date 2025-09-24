@@ -50,6 +50,7 @@ uint8_t msg_device1[] = {10, 20, 30, 40};
 uint8_t msg_device2[] = {50, 60, 70, 80};
 uint8_t msg_device3[] = {20,70,40,10};
 
+
 uint32_t previous_FR = 0;
 uint32_t current_FR = 0;
 int32_t drift = 0;
@@ -113,7 +114,7 @@ void setindpolls() {
     if (lastmyseqnum == lastpacketseqnum) {
         idx_response++;
         lastActivityMillis = millis();
-        log_i("Tx.sn=%d Rx.sn=%d Rx.cnt=%d ", lastmyseqnum, lastpacketseqnum, idx_response);
+        // log_i("Tx.sn=%d Rx.sn=%d Rx.cnt=%d ", lastmyseqnum, lastpacketseqnum, idx_response);
 
         #if DISPLAY_ENABLE  
         {
@@ -159,31 +160,34 @@ void applicationTask(void* pvParameters) {
                 if (loramesh.mydd.devtype == DEV_TYPE_ROUTER) {
                     // Serial.println(loramesh.parsePacket(0));
                     // log_i("%d",loramesh.receivePacket());
-                        if (loramesh.receivePacket()) {
+                    int ret = loramesh.receivePacket();
+                        if (ret) {
+                            log_i("entrou");
                             uint8_t sender_address = loramesh.lastpkt.srcaddress;
                             uint8_t* rxpacket = loramesh.lastpkt.rxpacket; // Usa o buffer da própria loramesh
 
                             // Verifica qual dispositivo enviou a mensagem pelo endereço de origem
                             switch (sender_address) {
+                            
                                 case 2: // Endereço do End Device 1, conforme devid[] em Loramesh.cpp
                                     if (actualslot != END_DEVICE_1_SLOT) {
                                         log_w("Alerta: Pacote do End Device 1 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
                                     }
-                                    log_i("Resposta do End Device 1 recebida no slot %d: %d", actualslot, rxpacket[0]);
+                                    log_i("Resposta do End Device 1 recebida no slot %d: %d", actualslot, rxpacket[8]);
                                     break;
 
                                 case 3: // Endereço do End Device 2
                                     if (actualslot != END_DEVICE_2_SLOT) {
                                         log_w("Alerta: Pacote do End Device 2 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
                                     }
-                                    log_i("Resposta do End Device 2 recebida no slot %d: %d", actualslot, rxpacket[0]);
+                                    log_i("Resposta do End Device 2 recebida no slot %d: %d", actualslot, rxpacket[8]);
                                     break;
 
                                 case 4: // Endereço do End Device 3
                                     if (actualslot != END_DEVICE_3_SLOT) {
                                         log_w("Alerta: Pacote do End Device 3 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
                                     }
-                                    log_i("Resposta do End Device 3 recebida no slot %d: %d", actualslot, rxpacket[0]);
+                                    log_i("Resposta do End Device 3 recebida no slot %d: %d", actualslot, rxpacket[8]);
                                     break;
 
                                 default:
