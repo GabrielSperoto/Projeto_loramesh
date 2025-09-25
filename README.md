@@ -1,5 +1,5 @@
 # Projeto_loramesh
-<p>O presente projeto tem como objetvio implementar uma rede mesh com base no protocolo lora. Atualmente, o código  implementa uma rede de topologia estrela com três nós, sendo um deles o router (gateway). Pode ser dividido fundamentalmente em três tarefas:</p>
+<p>O presente projeto tem como objetvio implementar uma rede mesh baseado na tecnologia Lora. Atualmente, o código  implementa uma rede de topologia estrela com três nós, sendo um deles o router. Pode ser dividido fundamentalmente em três tarefas:</p>
 <ul>
   <li>Sendtask: responsável pelo envio do frame ou do beacon, no caso do router</li>
   <li>Aplicationtask: responsável por gerenciar a máquina de estados do sistem</li>

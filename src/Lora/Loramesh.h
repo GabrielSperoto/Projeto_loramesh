@@ -73,10 +73,14 @@ typedef enum {
    DEV_TYPE_ROUTER=1,
    DEV_TYPE_ENDDEV
 } devicetype;
+
 typedef enum {
    FCT_BEACON=1,
    FCT_JOIN,
-   FCT_DATA
+   FCT_DATA,
+   FCT_DESCRIPTION,
+   FCT_READING,
+   FCT_WRITING
 } functioncode;
 
 typedef enum  {
@@ -84,7 +88,9 @@ typedef enum  {
     ST_RXWAIT,
     ST_RXDONE,
     ST_TXDATA,
-    ST_STANDBY
+    ST_STANDBY,
+    ST_TXREQUEST,
+    ST_RXRESPONSE
 }statemac;
 
 #if defined (__STM32F1__)
@@ -121,6 +127,8 @@ public:
   void restartRadio(void);
   int startReceiving(void);
   uint8_t sendPacketRes(uint8_t dstaddr, uint32_t dtvalue);
+
+  uint8_t sendPacketReq(uint8_t dst, uint8_t fct, uint8_t start, uint8_t qtdParametros);
   uint8_t sendPacketReq(long timestamp);
 
   void setDioActionsForReceivePacket(void);

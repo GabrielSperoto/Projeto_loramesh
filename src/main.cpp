@@ -50,6 +50,10 @@ uint8_t msg_device1[] = {10, 20, 30, 40};
 uint8_t msg_device2[] = {50, 60, 70, 80};
 uint8_t msg_device3[] = {20,70,40,10};
 
+//frame de requisição que o route vai enviar
+//{DST,SRC,SEQ no,FCT,START,QTD PARAMETROS,CRC}
+uint8_t frame_router[] = {2,0,loramesh.mydd.seqnum,2,1,1,BYTE_CRC};
+
 
 uint32_t previous_FR = 0;
 uint32_t current_FR = 0;
@@ -106,6 +110,13 @@ void slottimecontrol() {
                 nextstate = ST_RXWAIT;
         }
     }
+
+    //router envia sempre o mesmo frame no slot 2
+    if(actualslot == 2){
+        if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
+            nextstate = ST_TXDATA;
+        }
+    }
 }
 
 void setindpolls() {
@@ -148,7 +159,7 @@ void applicationTask(void* pvParameters) {
             if ((loramesh.mydd.devtype == DEV_TYPE_ROUTER) && (actualslot == 0)) {
                 send_pct = 1;
                 lastActivityMillis = millis();
-                nextstate = ST_RXWAIT; 
+                nextstate = ST_STANDBY; 
             }
             break;
         case ST_RXWAIT:
@@ -225,7 +236,11 @@ void applicationTask(void* pvParameters) {
                 send_pct = 1;
                 nextstate = ST_RXWAIT; 
             }
-            loramesh.startReceiving();
+            // loramesh.startReceiving();
+            else if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
+                send_pct = 1;
+                nextstate = ST_RXWAIT;
+            }
             break;
         default:
             break;
@@ -240,10 +255,17 @@ void sendTask(void* pvParameters) {
         if (send_pct) {
             send_pct = 0;
             if (loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                uint16_t lastmyseqnum = loramesh.getLastSeqNum();  
-                loramesh.sendPacketReq(lastscantime_ms);
-                log_i("Tx.seqnum=%d",lastmyseqnum);
-                lastActivityMillis = millis();
+                if(actualslot == 0){
+                    uint16_t lastmyseqnum = loramesh.getLastSeqNum();  
+                    loramesh.sendPacketReq(lastscantime_ms);
+                    log_i("Tx.seqnum=%d",lastmyseqnum);
+                    lastActivityMillis = millis();
+                }
+                else if(actualslot == 2){
+                    uint8_t msg_size = sizeof(frame_router);
+                    loramesh.sendPacket(frame_router,msg_size);
+                    lastActivityMillis = millis();
+                }
             } else {
                 uint8_t *msg;
                 uint8_t msg_size;

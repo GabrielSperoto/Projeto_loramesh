@@ -552,6 +552,33 @@ uint16_t LoRaClass::getLastPctSeqNum(){
     return (lastpkt.seqnum);
 }
 
+
+//estrutura do pacote de requisição [dst,src,seq number, fct, start, qtd parametros, crc]
+//função não utilizad no código por enquanto
+uint8_t LoRaClass::sendPacketReq(uint8_t dst, uint8_t fct, uint8_t start, uint8_t qtdParametros){
+  
+  uint8_t buf[BUFFER_SIZE];
+  uint8_t pos = 0;
+  uint8_t *pucaux = (uint8_t *) &mydd.seqnum;
+  uint8_t ret;
+
+  buf[pos++] = dst;
+  buf[pos++] = mydd.devaddr;
+  buf[pos++] = *(pucaux+1);
+  buf[pos++] = *(pucaux+0);
+  buf[pos++] = fct;
+  buf[pos++] = start;
+  buf[pos++] = qtdParametros;
+  buf[pos++] = BYTE_CRC;
+
+  ret = sendPacket(buf,pos);
+
+  if (ret) 
+    return pos;
+  else
+    return 0;
+}
+
 uint8_t LoRaClass::sendPacketReq(long timestamp)
 {
     uint8_t ret=0;
