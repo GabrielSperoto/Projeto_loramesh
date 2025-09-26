@@ -163,72 +163,34 @@ void applicationTask(void* pvParameters) {
             }
             break;
         case ST_RXWAIT:
-        // Serial.print("Message received: ");
-        // Serial.println(messageReceived);
-            if (messageReceived){
-                messageReceived = false;
-                int len = 0;
-                if (loramesh.mydd.devtype == DEV_TYPE_ROUTER) {
-                    // Serial.println(loramesh.parsePacket(0));
-                    // log_i("%d",loramesh.receivePacket());
-                    int ret = loramesh.receivePacket();
-                        if (ret) {
-                            log_i("entrou");
-                            uint8_t sender_address = loramesh.lastpkt.srcaddress;
-                            uint8_t* rxpacket = loramesh.lastpkt.rxpacket; // Usa o buffer da própria loramesh
-
-                            // Verifica qual dispositivo enviou a mensagem pelo endereço de origem
-                            switch (sender_address) {
-                            
-                                case 2: // Endereço do End Device 1, conforme devid[] em Loramesh.cpp
-                                    if (actualslot != END_DEVICE_1_SLOT) {
-                                        log_w("Alerta: Pacote do End Device 1 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
-                                    }
-                                    log_i("Resposta do End Device 1 recebida no slot %d: %d", actualslot, rxpacket[8]);
-                                    break;
-
-                                case 3: // Endereço do End Device 2
-                                    if (actualslot != END_DEVICE_2_SLOT) {
-                                        log_w("Alerta: Pacote do End Device 2 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
-                                    }
-                                    log_i("Resposta do End Device 2 recebida no slot %d: %d", actualslot, rxpacket[8]);
-                                    break;
-
-                                case 4: // Endereço do End Device 3
-                                    if (actualslot != END_DEVICE_3_SLOT) {
-                                        log_w("Alerta: Pacote do End Device 3 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
-                                    }
-                                    log_i("Resposta do End Device 3 recebida no slot %d: %d", actualslot, rxpacket[8]);
-                                    break;
-
-                                default:
-                                    log_w("Recebido pacote de um endereço desconhecido: %d", sender_address);
-                                    break;
-                        }
-                        setindpolls();
-                        lastActivityMillis = millis();
-                        // nextstate = ST_STANDBY; que estado é esse??
-                    }
-                }else{
-                    if (loramesh.receivePacket()) {
-                        if (loramesh.lastpkt.fct == FCT_BEACON) {
-                            node_init_sync(loramesh.lastpkt.timestamp);
-                           //send_pct = 1;
-                           lastActivityMillis = millis();
-
-                           log_i("Rx.seqnum: %d",loramesh.lastpkt.seqnum);
-                            
-                           #if DISPLAY_ENABLE
-                           char display_line4[20]; 
-                           sprintf(display_line4,"Tx.seqnun: %d",loramesh.lastpkt.seqnum);
-                           Heltec.DisplayShowAll(display_line1,display_line2,display_line4);
-                           #endif
-
-                        }
-                        nextstate = ST_TXDATA; 
+            //manipula os pacotes recebidos pelo router e pelo ed
+            loramesh.startReceiving();
+            if(messageReceived){
+                if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
+                    //verifica a função da mensagem recebida
+                    switch (loramesh.lastpkt.fct){
+                        case FCT_WRITING:
+                            //mensagem de escrita
+                            break;
+                        case FCT_READING:
+                            //mensagem de leitura
+                            break;
+                        case FCT_DESCRIPTION:
+                            //mensagem de descrição
                     }
                 }
-                loramesh.startReceiving();
+                else{ //end device
+                    switch (loramesh.lastpkt.fct){
+                        case FCT_WRITING:
+                            //mensagem de escrita
+                            break;
+                        case FCT_READING:
+                            //mensagem de leitura
+                            break;
+                        case FCT_DESCRIPTION:
+                            //mensagem de descrição
+                    }
+                }
             }
             break;
         case ST_TXDATA: 
@@ -241,6 +203,9 @@ void applicationTask(void* pvParameters) {
                 send_pct = 1;
                 nextstate = ST_RXWAIT;
             }
+            break;
+        case ST_STANDBY:
+            //slepping mode
             break;
         default:
             break;
