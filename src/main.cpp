@@ -45,10 +45,6 @@ bool syncronized = false;
 #define END_DEVICE_2_SLOT 2
 #define END_DEVICE_3_SLOT 3
 
-// Frames de dados que os End Devices devem enviar
-uint8_t msg_device1[] = {10, 20, 30, 40};
-uint8_t msg_device2[] = {50, 60, 70, 80};
-uint8_t msg_device3[] = {20,70,40,10};
 
 //frame de requisição que o route vai enviar
 //{DST,SRC,SEQ no,FCT,START,QTD PARAMETROS,CRC}
@@ -109,14 +105,17 @@ void slottimecontrol() {
             else
                 nextstate = ST_RXWAIT;
         }
-    }
 
-    //router envia sempre o mesmo frame no slot 2
-    if(actualslot == 2){
+        //router envia sempre o mesmo frame no slot 2
+        if(actualslot == 2){
         if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
             nextstate = ST_TXDATA;
         }
     }
+    }
+
+    
+    
 }
 
 void setindpolls() {
@@ -164,31 +163,64 @@ void applicationTask(void* pvParameters) {
             break;
         case ST_RXWAIT:
             //manipula os pacotes recebidos pelo router e pelo ed
-            loramesh.startReceiving();
-            if(messageReceived){
+            // loramesh.startReceiving();
+            loramesh.receivePacket();
+            // log_i("%d",loramesh.parsePacket());
+            if(loramesh.receivePacket()){
+                log_i("Mensgem recebida !");
                 if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
+                    // loramesh.receivePacket();
                     //verifica a função da mensagem recebida
                     switch (loramesh.lastpkt.fct){
-                        case FCT_WRITING:
+                        case FCT_DATA:{
+                            setindpolls();
+                            break;
+                        }
+                        case FCT_WRITING: {
                             //mensagem de escrita
                             break;
-                        case FCT_READING:
-                            //mensagem de leitura
+                        }
+                        case FCT_READING: {
+                            log_i("Router: Pacote de leitura recebido.");
+                            uint8_t sender_address = loramesh.lastpkt.srcaddress;
+                            uint8_t* rx_packet = loramesh.lastpkt.rxpacket;
+
+                            // Converte os bytes do pacote para o tipo de dado WORD (uint16_t)
+                            uint16_t value = (uint16_t)rx_packet[6] << 8 | rx_packet[7];
+
+                            // Log para o monitor serial
+                            log_i("Leitura do dispositivo %d: %d", sender_address, value);
                             break;
-                        case FCT_DESCRIPTION:
+                        }
+                        case FCT_DESCRIPTION: {
                             //mensagem de descrição
+                            break;
+                        }
                     }
                 }
                 else{ //end device
-                    switch (loramesh.lastpkt.fct){
-                        case FCT_WRITING:
-                            //mensagem de escrita
-                            break;
-                        case FCT_READING:
-                            //mensagem de leitura
-                            break;
-                        case FCT_DESCRIPTION:
-                            //mensagem de descrição
+                    //verifica o destino da mensagem
+                    if(loramesh.lastpkt.dstaddress == loramesh.mydd.devaddr || loramesh.lastpkt.dstaddress == BROADCAST_ADDR){
+                        switch (loramesh.lastpkt.fct){
+                            case FCT_BEACON:{
+                                node_init_sync(loramesh.lastpkt.timestamp);
+                                log_i("Rx: %d",loramesh.lastpkt.seqnum);
+                                send_pct = 1;
+                            }
+                            case FCT_WRITING:{
+                                //mensagem de escrita
+                                break;
+                            }
+                            case FCT_READING:{
+                                log_i("Response enviada");
+                                //mensagem de leitura
+                                break;
+                            }
+                            case FCT_DESCRIPTION: {
+                                //mensagem de descrição
+                                break;
+                            }
+                        }
                     }
                 }
             }
@@ -229,28 +261,21 @@ void sendTask(void* pvParameters) {
                 else if(actualslot == 2){
                     uint8_t msg_size = sizeof(frame_router);
                     loramesh.sendPacket(frame_router,msg_size);
+                    log_i("Requisição enviada. Aguardando resposta ...");
                     lastActivityMillis = millis();
                 }
             } else {
+                //ed response
                 uint8_t *msg;
                 uint8_t msg_size;
-            
-                if (loramesh.mydd.dataslot == END_DEVICE_1_SLOT) {
-                    msg = msg_device1;
-                    msg_size = sizeof(msg_device1);
-                }else if (loramesh.mydd.dataslot == END_DEVICE_2_SLOT) {
-                    msg = msg_device2;
-                    msg_size = sizeof(msg_device2);
+                switch(loramesh.lastpkt.fct){
+                    case FCT_BEACON:{
+                        loramesh.sendPacketRes(1,1);
+                        break;
+                    }
                 }
-                 else if(loramesh.mydd.dataslot == END_DEVICE_3_SLOT) {
-                    msg = msg_device3;
-                    msg_size = sizeof(msg_device3);
-                }
-            
-                //envia o pacote para o router (dstaddress = 1)
-                loramesh.sendPacketRes(1, msg[0]);
                 lastActivityMillis = millis();
-                Serial.println("Mensagem enviada");
+                
 
             }
         }
