@@ -51,9 +51,9 @@ volatile bool operationDone = false;
 #if defined ( WIFI_LoRa_32_V2 )
 strDevicedescription devid[]={
    {0xACFD,DEV_TYPE_ROUTER,1,0},
-   {0xF482,DEV_TYPE_ENDDEV,2,2},
+   {0xACFD,DEV_TYPE_ROUTER,2,2},
    {0xCC7F,DEV_TYPE_ENDDEV,3,3},
-   {0X8096,DEV_TYPE_ENDDEV,4,4}
+   {0X8096,DEV_TYPE_ROUTER,4,4}
 };
 #else  //WIFI_LoRa_32_V3
 strDevicedescription devid[]={

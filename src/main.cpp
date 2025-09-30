@@ -28,6 +28,7 @@ char rxpacket[BUFFER_SIZE];
 #if DISPLAY_ENABLE  
 char display_line1[20];
 char display_line2[20];
+char display_line3[20];
 #endif
 
 statemac nextstate;
@@ -128,7 +129,6 @@ void setindpolls() {
 
         #if DISPLAY_ENABLE  
         {
-            char display_line3[20];
             sprintf(display_line3, "Tx=%d Rx=%d", lastmyseqnum, idx_response);
             Heltec.DisplayShowAll(display_line1, display_line2, display_line3);
         }   
@@ -158,18 +158,19 @@ void applicationTask(void* pvParameters) {
             if ((loramesh.mydd.devtype == DEV_TYPE_ROUTER) && (actualslot == 0)) {
                 send_pct = 1;
                 lastActivityMillis = millis();
-                nextstate = ST_STANDBY; 
+                nextstate = ST_RXWAIT; 
             }
             break;
         case ST_RXWAIT:
             //manipula os pacotes recebidos pelo router e pelo ed
-            // loramesh.startReceiving();
+            loramesh.startReceiving();
             loramesh.receivePacket();
-            // log_i("%d",loramesh.parsePacket());
-            if(loramesh.receivePacket()){
-                log_i("Mensgem recebida !");
+            // log_i("%d",loramesh.parsePacket(0));
+            if(messageReceived){
+                messageReceived = 0;
+                // log_i("Mensagem recebida !");
                 if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                    // loramesh.receivePacket();
+                    loramesh.receivePacket();
                     //verifica a função da mensagem recebida
                     switch (loramesh.lastpkt.fct){
                         case FCT_DATA:{
@@ -181,15 +182,15 @@ void applicationTask(void* pvParameters) {
                             break;
                         }
                         case FCT_READING: {
-                            log_i("Router: Pacote de leitura recebido.");
-                            uint8_t sender_address = loramesh.lastpkt.srcaddress;
-                            uint8_t* rx_packet = loramesh.lastpkt.rxpacket;
+                            // log_i("Router: Pacote de leitura recebido.");
+                            // uint8_t sender_address = loramesh.lastpkt.srcaddress;
+                            // uint8_t* rx_packet = loramesh.lastpkt.rxpacket;
 
-                            // Converte os bytes do pacote para o tipo de dado WORD (uint16_t)
-                            uint16_t value = (uint16_t)rx_packet[6] << 8 | rx_packet[7];
+                            // // Converte os bytes do pacote para o tipo de dado WORD (uint16_t)
+                            // uint16_t value = (uint16_t)rx_packet[6] << 8 | rx_packet[7];
 
-                            // Log para o monitor serial
-                            log_i("Leitura do dispositivo %d: %d", sender_address, value);
+                            // // Log para o monitor serial
+                            // log_i("Leitura do dispositivo %d: %d", sender_address, value);
                             break;
                         }
                         case FCT_DESCRIPTION: {
@@ -200,25 +201,28 @@ void applicationTask(void* pvParameters) {
                 }
                 else{ //end device
                     //verifica o destino da mensagem
-                    if(loramesh.lastpkt.dstaddress == loramesh.mydd.devaddr || loramesh.lastpkt.dstaddress == BROADCAST_ADDR){
-                        switch (loramesh.lastpkt.fct){
-                            case FCT_BEACON:{
-                                node_init_sync(loramesh.lastpkt.timestamp);
-                                log_i("Rx: %d",loramesh.lastpkt.seqnum);
-                                send_pct = 1;
-                            }
-                            case FCT_WRITING:{
-                                //mensagem de escrita
-                                break;
-                            }
-                            case FCT_READING:{
-                                log_i("Response enviada");
-                                //mensagem de leitura
-                                break;
-                            }
-                            case FCT_DESCRIPTION: {
-                                //mensagem de descrição
-                                break;
+                    uint8_t ret = loramesh.receivePacket();
+                    if(ret){
+                        if(loramesh.lastpkt.dstaddress == loramesh.mydd.devaddr || loramesh.lastpkt.dstaddress == BROADCAST_ADDR){
+                            switch (loramesh.lastpkt.fct){
+                                case FCT_BEACON:{
+                                    node_init_sync(loramesh.lastpkt.timestamp);
+                                    log_i("Rx: %d",loramesh.lastpkt.seqnum);
+                                    nextstate = ST_TXDATA;
+                                }
+                                case FCT_WRITING:{
+                                    //mensagem de escrita
+                                    break;
+                                }
+                                case FCT_READING:{
+                                    log_i("Response enviada");
+                                    //mensagem de leitura
+                                    break;
+                                }
+                                case FCT_DESCRIPTION: {
+                                    //mensagem de descrição
+                                    break;
+                                }
                             }
                         }
                     }
@@ -242,7 +246,7 @@ void applicationTask(void* pvParameters) {
         default:
             break;
     }
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(20 / portTICK_PERIOD_MS);
     }
 }
 
@@ -254,16 +258,25 @@ void sendTask(void* pvParameters) {
             if (loramesh.mydd.devtype == DEV_TYPE_ROUTER){
                 if(actualslot == 0){
                     uint16_t lastmyseqnum = loramesh.getLastSeqNum();  
-                    loramesh.sendPacketReq(lastscantime_ms);
-                    log_i("Tx.seqnum=%d",lastmyseqnum);
+                    uint8_t ret = loramesh.sendPacketReq(lastscantime_ms);
+                    if(ret != 0){
+                        log_i("Tx.seqnum=%d",lastmyseqnum);
+                        #if DISPLAY_ENABLE
+                            sprintf(display_line3,"Tx.seqnum = %d", lastmyseqnum);
+                            Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
+                        #endif
+                    }
+                    else{
+                        log_i("Falha no envio do beacon !");
+                    }
                     lastActivityMillis = millis();
                 }
-                else if(actualslot == 2){
-                    uint8_t msg_size = sizeof(frame_router);
-                    loramesh.sendPacket(frame_router,msg_size);
-                    log_i("Requisição enviada. Aguardando resposta ...");
-                    lastActivityMillis = millis();
-                }
+                // else if(actualslot == 2){
+                //     uint8_t msg_size = sizeof(frame_router);
+                //     loramesh.sendPacket(frame_router,msg_size);
+                //     log_i("Requisição enviada. Aguardando resposta ...");
+                //     lastActivityMillis = millis();
+                // }
             } else {
                 //ed response
                 uint8_t *msg;
@@ -279,7 +292,7 @@ void sendTask(void* pvParameters) {
 
             }
         }
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        vTaskDelay(20 / portTICK_PERIOD_MS);
     }
 }
 
