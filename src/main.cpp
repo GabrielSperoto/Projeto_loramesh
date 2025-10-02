@@ -48,8 +48,8 @@ bool syncronized = false;
 
 
 //frame de requisição que o route vai enviar
-//{DST,SRC,SEQ no,FCT,START,QTD PARAMETROS,CRC}
-uint8_t frame_router[] = {2,0,loramesh.mydd.seqnum,2,1,1,BYTE_CRC};
+//{SRC,DST,FCT,Seq numb,START,QTD PARAMETROS,CRC}
+uint8_t frame_router[] = {0,2,FCT_READING,loramesh.mydd.seqnum,1,1,BYTE_CRC};
 
 
 uint32_t previous_FR = 0;
@@ -99,19 +99,15 @@ void slottimecontrol() {
         lastscantime_ms += currscantime_ms;
         actualslot++;
 
-        if (actualslot > MAX_SLOTS) {
-            actualslot = 0;
-            if (loramesh.mydd.devtype == DEV_TYPE_ROUTER)
-                nextstate = ST_TXBEACON;
-            else
-                nextstate = ST_RXWAIT;
-        }
+        if (actualslot > MAX_SLOTS) actualslot = 0;
 
         //router envia sempre o mesmo frame no slot 2
-        if(actualslot == 2){
-        if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-            nextstate = ST_TXDATA;
+        if(actualslot == 0){
+            if(loramesh.mydd.devtype == DEV_TYPE_ROUTER) nextstate = ST_TXBEACON;
+            else nextstate = ST_RXWAIT;
         }
+        else if(actualslot == 2){
+        if(loramesh.mydd.devtype == DEV_TYPE_ROUTER) nextstate = ST_TXDATA;
     }
     }
 
@@ -164,10 +160,8 @@ void applicationTask(void* pvParameters) {
         case ST_RXWAIT:
             //manipula os pacotes recebidos pelo router e pelo ed
             // loramesh.startReceiving();
-            uint8_t ret = loramesh.receivePacket();
             // log_i("%d",loramesh.parsePacket(0));
-            if(ret){
-                // log_i("Mensagem recebida !");
+            if(loramesh.receivePacket()){
                 if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
                     loramesh.receivePacket();
                     //verifica a função da mensagem recebida
@@ -200,28 +194,28 @@ void applicationTask(void* pvParameters) {
                 }
                 else{ //end device
                     //verifica o destino da mensagem
-                    uint8_t ret = loramesh.receivePacket();
-                    if(ret){
-                        if(loramesh.lastpkt.dstaddress == loramesh.mydd.devaddr || loramesh.lastpkt.dstaddress == BROADCAST_ADDR){
-                            switch (loramesh.lastpkt.fct){
-                                case FCT_BEACON:{
-                                    node_init_sync(loramesh.lastpkt.timestamp);
-                                    log_i("Rx: %d",loramesh.lastpkt.seqnum);
-                                    nextstate = ST_TXDATA;
-                                }
-                                case FCT_WRITING:{
-                                    //mensagem de escrita
-                                    break;
-                                }
-                                case FCT_READING:{
-                                    log_i("Response enviada");
-                                    //mensagem de leitura
-                                    break;
-                                }
-                                case FCT_DESCRIPTION: {
-                                    //mensagem de descrição
-                                    break;
-                                }
+                    
+                    if(loramesh.lastpkt.dstaddress == loramesh.mydd.devaddr || loramesh.lastpkt.dstaddress == BROADCAST_ADDR){
+                        log_i("%d",loramesh.lastpkt.fct);
+                        switch (loramesh.lastpkt.fct){
+                            case FCT_BEACON:{
+                                node_init_sync(loramesh.lastpkt.timestamp);
+                                log_i("Rx.seqnum: %d",loramesh.lastpkt.seqnum);
+                                nextstate = ST_TXDATA;
+                            }
+                            case FCT_WRITING:{
+                                //mensagem de escrita
+                                break;
+                            }
+                            case FCT_READING:{
+                                log_i("Response enviada");
+                                log_i("Timestamp: %d",loramesh.lastpkt.timestamp);
+                                //mensagem de leitura
+                                break;
+                            }
+                            case FCT_DESCRIPTION: {
+                                //mensagem de descrição
+                                break;
                             }
                         }
                     }
@@ -229,15 +223,8 @@ void applicationTask(void* pvParameters) {
             }
             break;
         case ST_TXDATA: 
-            if ((loramesh.mydd.devtype == DEV_TYPE_ENDDEV) && (actualslot == loramesh.mydd.dataslot)) {
-                send_pct = 1;
-                nextstate = ST_RXWAIT; 
-            }
-            // loramesh.startReceiving();
-            else if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                send_pct = 1;
-                nextstate = ST_RXWAIT;
-            }
+            send_pct = 1;
+            nextstate = ST_RXWAIT;
             break;
         case ST_STANDBY:
             //slepping mode
@@ -245,7 +232,7 @@ void applicationTask(void* pvParameters) {
         default:
             break;
     }
-        vTaskDelay(20 / portTICK_PERIOD_MS);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 
@@ -260,7 +247,7 @@ void sendTask(void* pvParameters) {
                     uint8_t ret = loramesh.sendPacketReq(lastscantime_ms);
                     if(ret != 0){
                         log_i("Tx.seqnum=%d",lastmyseqnum);
-                        #if DISPLAY_ENABLE
+                        #if 0
                             sprintf(display_line3,"Tx.seqnum = %d", lastmyseqnum);
                             Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
                         #endif
@@ -270,12 +257,12 @@ void sendTask(void* pvParameters) {
                     }
                     lastActivityMillis = millis();
                 }
-                // else if(actualslot == 2){
-                //     uint8_t msg_size = sizeof(frame_router);
-                //     loramesh.sendPacket(frame_router,msg_size);
-                //     log_i("Requisição enviada. Aguardando resposta ...");
-                //     lastActivityMillis = millis();
-                // }
+                else if(actualslot == 2){
+                    uint8_t msg_size = sizeof(frame_router);
+                    if(loramesh.sendPacket(frame_router,msg_size)) log_i("Requisição enviada. Aguardando resposta ...");
+                    else log_i("Falha no envio do frame !");
+                    lastActivityMillis = millis();
+                }
             } else {
                 //ed response
                 uint8_t *msg;
@@ -291,7 +278,7 @@ void sendTask(void* pvParameters) {
 
             }
         }
-        vTaskDelay(20 / portTICK_PERIOD_MS);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 
