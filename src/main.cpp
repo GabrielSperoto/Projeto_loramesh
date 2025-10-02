@@ -163,11 +163,10 @@ void applicationTask(void* pvParameters) {
             break;
         case ST_RXWAIT:
             //manipula os pacotes recebidos pelo router e pelo ed
-            loramesh.startReceiving();
-            loramesh.receivePacket();
+            // loramesh.startReceiving();
+            uint8_t ret = loramesh.receivePacket();
             // log_i("%d",loramesh.parsePacket(0));
-            if(messageReceived){
-                messageReceived = 0;
+            if(ret){
                 // log_i("Mensagem recebida !");
                 if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
                     loramesh.receivePacket();
