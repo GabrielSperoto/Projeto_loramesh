@@ -241,9 +241,13 @@ void sendTask(void* pvParameters) {
             send_pct = 0;
             if (loramesh.mydd.devtype == DEV_TYPE_ROUTER){
                 uint16_t lastmyseqnum = loramesh.getLastSeqNum();  
-                loramesh.sendPacketReq(lastscantime_ms);
-                log_i("Tx.seqnum=%d",lastmyseqnum);
-                lastActivityMillis = millis();
+                int ret = loramesh.sendPacketReq(lastscantime_ms);
+                if(ret != 0){
+                    log_i("Tx.seqnum=%d",lastmyseqnum);
+                    lastActivityMillis = millis();
+                } else{
+                    log_i("Falha no envio do beacon!");
+                }
             } else {
                 uint8_t *msg;
                 uint8_t msg_size;
