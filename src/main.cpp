@@ -174,20 +174,43 @@ void applicationTask(void* pvParameters) {
                             break;
                         }
                         case FCT_READING: {
-                            // log_i("Router: Pacote de leitura recebido.");
 
                             uint8_t* rxPacket = loramesh.lastpkt.rxpacket;
                             uint8_t packetSize = sizeof(rxPacket);
                             uint8_t valueSize = rxPacket[5];
                             uint8_t* bufferValue = (uint8_t*) malloc(valueSize * sizeof(uint8_t));
 
-                            loramesh.getResponseValue(rxPacket,packetSize,bufferValue,valueSize);
+                            //pega o o valor lido pelo ed
 
-                            // // Converte os bytes do pacote para o tipo de dado WORD (uint16_t)
-                            // uint16_t value = (uint16_t)rx_packet[6] << 8 | rx_packet[7];
+                            uint8_t size = loramesh.getResponseValue(rxPacket,packetSize,bufferValue,valueSize);
 
-                            // // Log para o monitor serial
-                            // log_i("Leitura do dispositivo %d: %d", sender_address, value);
+                            if(size > 0){
+                                log_i("Pacote de leitura recebido. Valor lido (%d bytes): ",size); 
+
+                                //se o valor for inteiro (2 bytes)
+                                if(size == 2){
+                                    uint16_t value = bufferValue[0] << 8 | bufferValue[1];
+                                    Serial.printf("Valor inteiro: %d\n",value);
+                                }
+                                //se o valor for um float (4 bytes)
+                                else if(size == 4){
+                                    float floatValue;
+                                    memcpy(&floatValue,bufferValue,size);
+                                    Serial.printf("Valor float: %f\n",floatValue);
+                                }
+
+                                //para tamanhos maiores que 4 bytes
+                                else{
+                                    for(int i =0; i<size;i++){
+                                        Serial.printf("%02X",bufferValue[i]);
+                                        Serial.println();
+                                    }
+                                }
+                            }
+
+                            else log_e("Erro na leitura do valor!");
+
+                            
 
                             free(bufferValue);
                             break;
