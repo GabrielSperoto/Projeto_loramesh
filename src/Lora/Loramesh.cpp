@@ -552,6 +552,18 @@ uint16_t LoRaClass::getLastPctSeqNum(){
     return (lastpkt.seqnum);
 }
 
+uint8_t getResponseCode(uint8_t* packet, uint8_t len){
+  if(len > 5) return packet[5];
+  else return -1;
+}
+
+uint8_t* getResponseValue(uint8_t* packet, uint8_t len){
+  uint8_t* pucaux;
+  uint8_t lenValue = packet[5];
+  
+
+}
+
 
 //estrutura do pacote de requisição [dst,src,seq number, fct, start, qtd parametros, crc]
 //função não utilizad no código por enquanto
@@ -693,7 +705,7 @@ bool LoRaClass::receivePacket()
         if ((ret) && ((lastpkt.srcaddress != mydd.devaddr))) {
             lastpkt.fct       = getfunction((uint8_t *)lastpkt.rxpacket,packetSize);
             lastpkt.seqnum    = getseqnum((uint8_t *)lastpkt.rxpacket,packetSize);
-            lastpkt.timestamp = gettimestamp((uint8_t *)lastpkt.rxpacket,packetSize);
+            // lastpkt.timestamp = gettimestamp((uint8_t *)lastpkt.rxpacket,packetSize);
             retcrc = checkcrc((uint8_t *)lastpkt.rxpacket,packetSize);
 
             //log_i("Rx len=%d seqnum=%d timestamp=%d retcrc=%d",packetSize, lastpkt.seqnum, lastpkt.timestamp,retcrc);

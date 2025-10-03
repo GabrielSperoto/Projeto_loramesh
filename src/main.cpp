@@ -163,7 +163,6 @@ void applicationTask(void* pvParameters) {
             // log_i("%d",loramesh.parsePacket(0));
             if(loramesh.receivePacket()){
                 if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                    loramesh.receivePacket();
                     //verifica a função da mensagem recebida
                     switch (loramesh.lastpkt.fct){
                         case FCT_DATA:{
@@ -199,7 +198,10 @@ void applicationTask(void* pvParameters) {
                         log_i("%d",loramesh.lastpkt.fct);
                         switch (loramesh.lastpkt.fct){
                             case FCT_BEACON:{
-                                node_init_sync(loramesh.lastpkt.timestamp);
+                                uint8_t* rxpacket = loramesh.lastpkt.rxpacket;
+                                uint8_t len = sizeof(rxpacket);
+                                uint32_t timestamp = loramesh.gettimestamp(rxpacket,len);
+                                node_init_sync(timestamp);
                                 log_i("Rx.seqnum: %d",loramesh.lastpkt.seqnum);
                                 nextstate = ST_TXDATA;
                             }
@@ -209,7 +211,6 @@ void applicationTask(void* pvParameters) {
                             }
                             case FCT_READING:{
                                 log_i("Response enviada");
-                                log_i("Timestamp: %d",loramesh.lastpkt.timestamp);
                                 //mensagem de leitura
                                 break;
                             }

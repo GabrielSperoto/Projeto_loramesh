@@ -48,7 +48,7 @@ typedef struct {
     uint8_t dstaddress;
     uint8_t fct;
     uint16_t seqnum=0;
-    uint32_t timestamp;
+    // uint32_t timestamp;
     uint8_t packetSize;
     uint8_t rxpacket[BUFFER_SIZE];
 } strPacket;
@@ -142,6 +142,8 @@ public:
   uint16_t getseqnum(uint8_t *packet,uint8_t len);
   uint16_t getLastSeqNum(void);
   uint16_t getLastPctSeqNum(void);
+  uint8_t getResponseCode(uint8_t* packet, uint8_t len);
+  uint8_t* getResponseValue(uint8_t* packet, uint8_t len);
 
   void clearBuffer(uint8_t *buffer, int size);
   bool getdevicedescription(void);
