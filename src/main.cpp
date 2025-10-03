@@ -175,14 +175,21 @@ void applicationTask(void* pvParameters) {
                         }
                         case FCT_READING: {
                             // log_i("Router: Pacote de leitura recebido.");
-                            // uint8_t sender_address = loramesh.lastpkt.srcaddress;
-                            // uint8_t* rx_packet = loramesh.lastpkt.rxpacket;
+
+                            uint8_t* rxPacket = loramesh.lastpkt.rxpacket;
+                            uint8_t packetSize = sizeof(rxPacket);
+                            uint8_t valueSize = rxPacket[5];
+                            uint8_t* bufferValue = (uint8_t*) malloc(valueSize * sizeof(uint8_t));
+
+                            loramesh.getResponseValue(rxPacket,packetSize,bufferValue,valueSize);
 
                             // // Converte os bytes do pacote para o tipo de dado WORD (uint16_t)
                             // uint16_t value = (uint16_t)rx_packet[6] << 8 | rx_packet[7];
 
                             // // Log para o monitor serial
                             // log_i("Leitura do dispositivo %d: %d", sender_address, value);
+
+                            free(bufferValue);
                             break;
                         }
                         case FCT_DESCRIPTION: {

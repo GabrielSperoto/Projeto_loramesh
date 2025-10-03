@@ -552,14 +552,21 @@ uint16_t LoRaClass::getLastPctSeqNum(){
     return (lastpkt.seqnum);
 }
 
-uint8_t getResponseCode(uint8_t* packet, uint8_t len){
+uint8_t LoRaClass::getResponseCode(uint8_t* packet, uint8_t len){
   if(len > 5) return packet[5];
-  else return -1;
+  return -1;
 }
 
-uint8_t* getResponseValue(uint8_t* packet, uint8_t len){
-  uint8_t* pucaux;
-  uint8_t lenValue = packet[5];
+uint8_t LoRaClass::getResponseValue(uint8_t* packet, uint8_t sizePacket, uint8_t* responseBuffer, uint8_t buffersize){
+  if(sizePacket > 5 && packet[2] == FCT_READING){
+    uint8_t valueSize = packet[5];
+    if(valueSize <= buffersize){
+      memcpy(responseBuffer,&packet[6],valueSize);
+      return valueSize;
+    }
+  }
+
+  return 0;
   
 
 }
