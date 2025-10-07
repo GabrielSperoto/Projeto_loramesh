@@ -59,7 +59,7 @@ typedef struct  {
     uint8_t  devtype;
     uint8_t  devaddr;
     uint8_t  dataslot;
-    uint8_t  seqnum;
+    uint16_t  seqnum;
 } strDevicedescription;
 
 // Fila para armazenar mensagens recebidas
