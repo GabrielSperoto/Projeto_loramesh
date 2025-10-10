@@ -158,8 +158,8 @@ void applicationTask(void* pvParameters) {
             // log_i("receivePacket(): %d",loramesh.receivePacket());
             if(loramesh.receivePacket()){
                 lastActivityMillis = millis();
-                // log_i("Mensagem recebida com sucesso ! Tamanho: %d", loramesh.receivePacket());
                 if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
+                    log_i("Mensagem recebida com sucesso ! Função do pacote: %d",loramesh.lastpkt.fct);
                     //verifica a função da mensagem recebida
                     switch (loramesh.lastpkt.fct){
                         case FCT_DATA:{
@@ -173,6 +173,7 @@ void applicationTask(void* pvParameters) {
                         }
                         case FCT_READING: {
 
+
                             uint8_t* rxPacket = loramesh.lastpkt.rxpacket;
                             uint8_t packetSize = sizeof(rxPacket);
                             uint8_t valueSize = rxPacket[5];
@@ -182,30 +183,16 @@ void applicationTask(void* pvParameters) {
 
                             uint8_t size = loramesh.getResponseValue(rxPacket,packetSize,bufferValue,valueSize);
 
+                            log_i("Pacote recebido: %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3],rxpacket[4],rxpacket[5],rxpacket[6],rxpacket[7],rxpacket[8],rxpacket[9]);
+
                             log_i("Size: %d",size);
 
                             if(size > 0){
                                 log_i("Pacote de leitura recebido. Valor lido (%d bytes): ",size); 
 
-                                //se o valor for inteiro (2 bytes)
-                                if(size == 2){
-                                    uint16_t value = bufferValue[0] << 8 | bufferValue[1];
-                                    Serial.printf("Valor inteiro: %d\n",value);
-                                }
-                                //se o valor for um float (4 bytes)
-                                else if(size == 4){
-                                    float floatValue;
-                                    memcpy(&floatValue,bufferValue,size);
-                                    Serial.printf("Valor float: %f\n",floatValue);
-                                }
-
-                                //para tamanhos maiores que 4 bytes
-                                else{
-                                    for(int i =0; i<size;i++){
-                                        Serial.printf("%02X",bufferValue[i]);
-                                        Serial.println();
-                                    }
-                                }
+                                float value;
+                                memcpy(&value,bufferValue,size);
+                                Serial.printf("Valor float: %f\n",value);
                             }
 
                             else log_e("Erro na leitura do valor!");
@@ -306,31 +293,17 @@ void sendTask(void* pvParameters) {
                 uint8_t msg_size;
                 switch(loramesh.lastpkt.fct){
                     case FCT_BEACON:{
-                        loramesh.sendPacketRes(1,1);
+                        loramesh.sendPacketRes(1);
                         nextstate = ST_RXWAIT;
                         break;
                     case FCT_READING:{
                         //response frame
                         //{SRC,DST,FCT,SEQ NUMBER,SIZE VALUE,VALUE,CRC};
-                        uint16_t value = 230; // exemplo de leitura de um potenciometro
+                        uint32_t value = 230; // exemplo de leitura de um potenciometro
                         uint8_t sizeValue = sizeof(value);
-                        uint16_t lastmyseqnumb = loramesh.getLastSeqNum();
-                        uint8_t* pucaux = (uint8_t*) &lastmyseqnumb;
-                        uint8_t aux = 0;
-                        uint8_t srcadress = loramesh.mydd.devaddr;
-                        uint8_t buffer[BUFFER_SIZE];
 
-                        buffer[aux++] = srcadress;
-                        buffer[aux++] = 1;
-                        buffer[aux++] = *(pucaux+1);
-                        buffer[aux++] = *(pucaux);
-                        buffer[aux++] = sizeValue;
-                        pucaux = (uint8_t*) &value;
-                        buffer[aux++] = *(pucaux+1);
-                        buffer[aux++] = *(pucaux);
-                        buffer[aux++] = BYTE_CRC;
-                        if(loramesh.sendPacket(buffer,aux)) log_i("Response enviada!");
-                        else log_i("Falha no envio da response!");
+                        if (loramesh.sendPacketResponse(1,sizeValue,value)) log_i("Resposta enviada!");
+                        else log_e ("Falha no envio da resposta!");
                         nextstate = ST_RXWAIT;
                         break;
                         

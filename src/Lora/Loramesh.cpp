@@ -640,7 +640,29 @@ uint8_t LoRaClass::sendPacketReq(long timestamp)
 
 }
 
-uint8_t LoRaClass::sendPacketRes(uint8_t dstaddr, uint32_t dtvalue)
+//função implementada para enviar valores inteiros (2 bytes)
+
+uint8_t LoRaClass::sendPacketResponse(uint8_t dst, uint8_t size, uint32_t value){
+  uint8_t buffer[BUFFER_SIZE];
+  uint8_t* pucaux = (uint8_t*) &lastpkt.seqnum;
+  uint8_t aux = 0;
+  buffer[aux++] = mydd.devaddr;
+  buffer[aux++] = dst;
+  buffer[aux++] = FCT_READING;
+  buffer[aux++] = *(pucaux+1);
+  buffer[aux++] = *(pucaux);
+  buffer[aux++] = size;
+  pucaux = (uint8_t*) &value;
+  buffer[aux++] = *(pucaux+3);
+  buffer[aux++] = *(pucaux+2);
+  buffer[aux++] = *(pucaux+1);
+  buffer[aux++] = *(pucaux);
+  buffer[aux++] = BYTE_CRC;
+  if(loramesh.sendPacket(buffer,aux)) return 1;
+  return 0;
+}
+
+uint8_t LoRaClass::sendPacketRes(uint8_t dstaddr)
 {
     uint8_t ret=0;
     uint8_t pos=0;
@@ -650,11 +672,6 @@ uint8_t LoRaClass::sendPacketRes(uint8_t dstaddr, uint32_t dtvalue)
     buf[pos++] =  mydd.devaddr;
     buf[pos++] =  dstaddr;
     buf[pos++] =  FCT_DATA;
-    buf[pos++] =  *(pucaux+1);
-    buf[pos++] =  *(pucaux+0);
-    pucaux = (uint8_t *) &dtvalue; 
-    buf[pos++] =  *(pucaux+3);
-    buf[pos++] =  *(pucaux+2);
     buf[pos++] =  *(pucaux+1);
     buf[pos++] =  *(pucaux+0);
     buf[pos++] =  BYTE_CRC;
@@ -699,6 +716,7 @@ bool LoRaClass::receivePacket()
 
 #else // V2
     packetSize = loramesh.parsePacket(0);
+    // log_i("Packetsize: %d",packetSize);
     if (packetSize) {
         while (loramesh.available() && len < BUFFER_SIZE - 1) {
             lastpkt.rxpacket[len++] = (char)loramesh.read(); // Lê o pacote byte a byte

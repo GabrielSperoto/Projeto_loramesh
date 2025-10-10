@@ -126,10 +126,13 @@ public:
     
   void restartRadio(void);
   int startReceiving(void);
-  uint8_t sendPacketRes(uint8_t dstaddr, uint32_t dtvalue);
+  
 
   uint8_t sendPacketReq(uint8_t dst, uint8_t fct, uint8_t start, uint8_t qtdParametros);
   uint8_t sendPacketReq(long timestamp);
+  uint8_t sendPacketResponse(uint8_t dst, uint8_t size, uint32_t value); //envio de uma resposta de leitura
+  uint8_t sendPacketRes(uint8_t dstaddr); //envio de uma resposta de beacon
+
 
   void setDioActionsForReceivePacket(void);
   void clearDioActions(void);
@@ -144,6 +147,7 @@ public:
   uint16_t getLastPctSeqNum(void);
   uint8_t getResponseCode(uint8_t* packet, uint8_t len);
   uint8_t getResponseValue(uint8_t* packet, uint8_t size, uint8_t* responseBuffer, uint8_t buffersize);
+ 
 
   void clearBuffer(uint8_t *buffer, int size);
   bool getdevicedescription(void);
