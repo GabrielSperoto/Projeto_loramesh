@@ -145,8 +145,8 @@ public:
   uint16_t getseqnum(uint8_t *packet,uint8_t len);
   uint16_t getLastSeqNum(void);
   uint16_t getLastPctSeqNum(void);
-  uint8_t getResponseCode(uint8_t* packet, uint8_t len);
-  uint8_t getResponseValue(uint8_t* packet, uint8_t size, uint8_t* responseBuffer, uint8_t buffersize);
+  uint8_t getResponseCode(uint8_t* packet);
+  uint8_t getResponseValue(uint8_t* packet, uint8_t* responseBuffer, uint8_t buffersize);
  
 
   void clearBuffer(uint8_t *buffer, int size);

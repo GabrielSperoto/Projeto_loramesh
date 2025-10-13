@@ -175,24 +175,30 @@ void applicationTask(void* pvParameters) {
 
 
                             uint8_t* rxPacket = loramesh.lastpkt.rxpacket;
-                            uint8_t packetSize = sizeof(rxPacket);
                             uint8_t valueSize = rxPacket[5];
-                            uint8_t* bufferValue = (uint8_t*) malloc(valueSize * sizeof(uint8_t));
+                            uint8_t* bufferValue = (uint8_t*) malloc(valueSize * sizeof(uint8_t)); //buffer para armazenamento do valor lido
 
                             //pega o o valor lido pelo ed
 
-                            uint8_t size = loramesh.getResponseValue(rxPacket,packetSize,bufferValue,valueSize);
+                            uint8_t size = loramesh.getResponseValue(rxPacket,bufferValue,valueSize);
 
                             // log_i("Pacote recebido: %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3],rxpacket[4],rxpacket[5],rxpacket[6],rxpacket[7],rxpacket[8],rxpacket[9]);
 
-                            log_i("Size: %d",size);
+                            // log_i("Size: %d",size);
 
                             if(size > 0){
                                 log_i("Pacote de leitura recebido. Valor lido (%d bytes): ",size); 
 
-                                float value;
-                                memcpy(&value,bufferValue,size);
-                                Serial.printf("Valor float: %f\n",value);
+                                uint32_t value;
+                                log_i("bufferValue: %2X %2X %2X %2X", bufferValue[0],bufferValue[1],bufferValue[2],bufferValue[3]);
+
+                                //copia os bytes do buffer para uma variavei valor;
+                                //a copia e feita invertida pois o processador da esp e little-endian
+                                int aux = 0;
+                                for(int i = 3; i >= 0; i--){
+                                    *(&value + aux++) = bufferValue[i];
+                                }
+                                Serial.printf("Valor: %d\n",value);
                             }
 
                             else log_e("Erro na leitura do valor!");
@@ -213,7 +219,7 @@ void applicationTask(void* pvParameters) {
                     switch (loramesh.lastpkt.fct){
                         case FCT_BEACON:{
                             uint8_t* rxpacket = loramesh.lastpkt.rxpacket;
-                            uint8_t len = sizeof(rxpacket);
+                            uint8_t len = loramesh.lastpkt.packetSize;
                             uint32_t timestamp = loramesh.gettimestamp(rxpacket,len);
                             node_init_sync(timestamp);
                             log_i("Rx.seqnum: %d", loramesh.lastpkt.seqnum);

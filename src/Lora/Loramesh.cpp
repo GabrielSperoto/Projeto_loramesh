@@ -552,13 +552,13 @@ uint16_t LoRaClass::getLastPctSeqNum(){
     return (lastpkt.seqnum);
 }
 
-uint8_t LoRaClass::getResponseCode(uint8_t* packet, uint8_t len){
-  if(len > 5) return packet[5];
+uint8_t LoRaClass::getResponseCode(uint8_t* packet){
+  if(lastpkt.packetSize > 5) return packet[5];
   return -1;
 }
 
-uint8_t LoRaClass::getResponseValue(uint8_t* packet, uint8_t sizePacket, uint8_t* responseBuffer, uint8_t buffersize){
-  if(sizePacket > 5 && packet[2] == FCT_READING){
+uint8_t LoRaClass::getResponseValue(uint8_t* packet, uint8_t* responseBuffer, uint8_t buffersize){
+  if(lastpkt.packetSize > 5 && packet[2] == FCT_READING){
     uint8_t valueSize = packet[5];
     if(valueSize <= buffersize){
       memcpy(responseBuffer,&packet[6],valueSize);
@@ -716,12 +716,11 @@ bool LoRaClass::receivePacket()
 
 #else // V2
     packetSize = loramesh.parsePacket(0);
-    // log_i("Packetsize: %d",packetSize);
+    lastpkt.packetSize = packetSize;
+    // log_i("Packetsize: %d",lastpkt.packetSize);
     if (packetSize) {
-        log_i("Message: ");
         while (loramesh.available() && len < BUFFER_SIZE - 1) {
-            lastpkt.rxpacket[len] = (char)loramesh.read(); // Lê o pacote byte a byte
-            log_i("%2X ",lastpkt.rxpacket[len++]);
+            lastpkt.rxpacket[len++] = (char)loramesh.read(); // Lê o pacote byte a byte
         }
 #endif
 
