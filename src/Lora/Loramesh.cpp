@@ -718,8 +718,10 @@ bool LoRaClass::receivePacket()
     packetSize = loramesh.parsePacket(0);
     // log_i("Packetsize: %d",packetSize);
     if (packetSize) {
+        log_i("Message: ");
         while (loramesh.available() && len < BUFFER_SIZE - 1) {
-            lastpkt.rxpacket[len++] = (char)loramesh.read(); // Lê o pacote byte a byte
+            lastpkt.rxpacket[len] = (char)loramesh.read(); // Lê o pacote byte a byte
+            log_i("%2X ",lastpkt.rxpacket[len++]);
         }
 #endif
 

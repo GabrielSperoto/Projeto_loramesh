@@ -183,7 +183,7 @@ void applicationTask(void* pvParameters) {
 
                             uint8_t size = loramesh.getResponseValue(rxPacket,packetSize,bufferValue,valueSize);
 
-                            log_i("Pacote recebido: %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3],rxpacket[4],rxpacket[5],rxpacket[6],rxpacket[7],rxpacket[8],rxpacket[9]);
+                            // log_i("Pacote recebido: %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3],rxpacket[4],rxpacket[5],rxpacket[6],rxpacket[7],rxpacket[8],rxpacket[9]);
 
                             log_i("Size: %d",size);
 
