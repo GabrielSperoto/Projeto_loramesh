@@ -1,11 +1,16 @@
 Biblioteca Loramesh
-Author: Renato F. Fernandes, Natan Ferreira Alvarenga, Hermes G. Fernandes Neri
+Author: Renato F. Fernandes, Natan Ferreira Alvarenga, Hermes G. Fernandes Neri, Gabriel Speroto
 Descricao:  
    - Codigo lora utilizando placas Heltec WIFI ESP32 lora V2 e V3. 
     (para compilar para uma placa V2 ou V3 basta alterar o arquivo platformio.ini)
    - O codigo é baseado nas bibliotecas basicas da Heltec.
    https://github.com/HelTecAutomation/Heltec_ESP32/tree/master/examples
    e radiolib.h 
+
+V1_01xx
+   - Merge com a versao do Gabriel /Natan com tarefas de aplicacao e sendtask em arquivos separados.
+   - esta versao nao funciona a resposta do escravo para o mestre na janela de tmepo especificada.
+ 
 
 V1_01
    - Esta versão suporta V2 e V3, bastando alterar o platformio.ini. Esta funcionando as duas placas misturadas (ou seja, nao importa se eh V2 ou V3 elas conseguem enviar e receber para qualquer placa)

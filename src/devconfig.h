@@ -45,7 +45,7 @@
 
 #define MAX_PACKET_SIZE  30
 
-#define MAX_SLOTS   2
+#define MAX_SLOTS   3
 #define BEACON_SLOT 0 
 
 //Intervalo entre os envios
@@ -94,7 +94,7 @@ V2 -
    goes from 0 to 1 where 0 is the lowest gain and 1 is the highest gain 
    nao sei o que eh este ganho...sera que eh o #define PABOOST TRUE ?*/
  
-#define LORA_GAIN 0
+#define LORA_GAIN 1
 
 /* cr */
 #define LORA_CR 5
