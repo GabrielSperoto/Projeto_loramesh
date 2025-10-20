@@ -7,8 +7,9 @@
 #include "esp_log.h"
 
 // --- Variáveis Globais (Mantidas do seu código original) ---
-#define PinPot 37
-uint16_t valorPot = 0;
+#define PinPot 25
+#define pinLed 14
+uint32_t valorPot = 0;
 float TensaoDeSaida = 0;
 
 #if DISPLAY_ENABLE
@@ -28,6 +29,7 @@ char rxpacket[BUFFER_SIZE];
 #if DISPLAY_ENABLE  
 char display_line1[20];
 char display_line2[20];
+char display_line3[20];
 #endif
 
 statemac nextstate;
@@ -44,12 +46,6 @@ bool syncronized = false;
 #define END_DEVICE_1_SLOT 1
 #define END_DEVICE_2_SLOT 2
 #define END_DEVICE_3_SLOT 3
-
-// Frames de dados que os End Devices devem enviar
-uint8_t msg_device1[] = {10, 20, 30, 40};
-uint8_t msg_device2[] = {50, 60, 70, 80};
-uint8_t msg_device3[] = {20,70,40,10};
-
 
 uint32_t previous_FR = 0;
 uint32_t current_FR = 0;
@@ -98,14 +94,20 @@ void slottimecontrol() {
         lastscantime_ms += currscantime_ms;
         actualslot++;
 
-        if (actualslot > MAX_SLOTS) {
-            actualslot = 0;
-            if (loramesh.mydd.devtype == DEV_TYPE_ROUTER)
-                nextstate = ST_TXBEACON;
-            else
-                nextstate = ST_RXWAIT;
+        if (actualslot > MAX_SLOTS) actualslot = 0;
+
+        //router envia sempre o mesmo frame no slot 2
+        if(actualslot == 0){
+            if(loramesh.mydd.devtype == DEV_TYPE_ROUTER) nextstate = ST_TXBEACON;
+            else nextstate = ST_RXWAIT;
         }
+        else if(actualslot == 2){
+        if(loramesh.mydd.devtype == DEV_TYPE_ROUTER) nextstate = ST_TXDATA;
     }
+    }
+
+    
+    
 }
 
 void setindpolls() {
@@ -118,7 +120,6 @@ void setindpolls() {
 
         #if DISPLAY_ENABLE  
         {
-            char display_line3[20];
             sprintf(display_line3, "Tx=%d Rx=%d", lastmyseqnum, idx_response);
             Heltec.DisplayShowAll(display_line1, display_line2, display_line3);
         }   
@@ -152,80 +153,115 @@ void applicationTask(void* pvParameters) {
             }
             break;
         case ST_RXWAIT:
-        // Serial.print("Message received: ");
-        // Serial.println(messageReceived);
-            if (messageReceived){
-                messageReceived = false;
-                int len = 0;
-                if (loramesh.mydd.devtype == DEV_TYPE_ROUTER) {
-                    // Serial.println(loramesh.parsePacket(0));
-                    // log_i("%d",loramesh.receivePacket());
-                    int ret = loramesh.receivePacket();
-                        if (ret) {
-                            log_i("entrou");
-                            uint8_t sender_address = loramesh.lastpkt.srcaddress;
-                            uint8_t* rxpacket = loramesh.lastpkt.rxpacket; // Usa o buffer da própria loramesh
-
-                            // Verifica qual dispositivo enviou a mensagem pelo endereço de origem
-                            switch (sender_address) {
-                            
-                                case 2: // Endereço do End Device 1, conforme devid[] em Loramesh.cpp
-                                    if (actualslot != END_DEVICE_1_SLOT) {
-                                        log_w("Alerta: Pacote do End Device 1 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
-                                    }
-                                    log_i("Resposta do End Device 1 recebida no slot %d: %d", actualslot, rxpacket[8]);
-                                    break;
-
-                                case 3: // Endereço do End Device 2
-                                    if (actualslot != END_DEVICE_2_SLOT) {
-                                        log_w("Alerta: Pacote do End Device 2 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
-                                    }
-                                    log_i("Resposta do End Device 2 recebida no slot %d: %d", actualslot, rxpacket[8]);
-                                    break;
-
-                                case 4: // Endereço do End Device 3
-                                    if (actualslot != END_DEVICE_3_SLOT) {
-                                        log_w("Alerta: Pacote do End Device 3 (Addr %d) recebido fora do slot esperado (Slot Atual: %d)", sender_address, actualslot);
-                                    }
-                                    log_i("Resposta do End Device 3 recebida no slot %d: %d", actualslot, rxpacket[8]);
-                                    break;
-
-                                default:
-                                    log_w("Recebido pacote de um endereço desconhecido: %d", sender_address);
-                                    break;
+            //manipula os pacotes recebidos pelo router e pelo ed
+            // loramesh.startReceiving();
+            // log_i("parsePacket(0): %d",loramesh.parsePacket(0));
+            // log_i("receivePacket(): %d",loramesh.receivePacket());
+            if(loramesh.receivePacket()){
+                lastActivityMillis = millis();
+                if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
+                    log_i("Mensagem recebida com sucesso ! Função do pacote: %d",loramesh.lastpkt.fct);
+                    //verifica a função da mensagem recebida
+                    switch (loramesh.lastpkt.fct){
+                        case FCT_DATA:{
+                            setindpolls();
+                            // log_i("Rx.seqnumb: %d",loramesh.lastpkt.seqnum);
+                            break;
                         }
-                        setindpolls();
-                        lastActivityMillis = millis();
-                        // nextstate = ST_STANDBY; que estado é esse??
-                    }
-                }else{
-                    if (loramesh.receivePacket()) {
-                        if (loramesh.lastpkt.fct == FCT_BEACON) {
-                            node_init_sync(loramesh.lastpkt.timestamp);
-                           //send_pct = 1;
-                           lastActivityMillis = millis();
-
-                           log_i("Rx.seqnum: %d",loramesh.lastpkt.seqnum);
-                            
-                           #if DISPLAY_ENABLE
-                           char display_line4[20]; 
-                           sprintf(display_line4,"Tx.seqnun: %d",loramesh.lastpkt.seqnum);
-                           Heltec.DisplayShowAll(display_line1,display_line2,display_line4);
-                           #endif
-
+                        case FCT_WRITING: {
+                            //mensagem de escrita
+                            break;
                         }
-                        nextstate = ST_TXDATA; 
+                        case FCT_READING: {
+
+
+                            uint8_t* rxPacket = loramesh.lastpkt.rxpacket;
+                            uint8_t valueSize = rxPacket[5];
+                            uint8_t* bufferValue = (uint8_t*) malloc(valueSize * sizeof(uint8_t)); //buffer para armazenamento do valor lido
+
+                            //pega o o valor lido pelo ed
+
+                            uint8_t size = loramesh.getResponseValue(rxPacket,bufferValue,valueSize);
+
+                            // log_i("Pacote recebido: %2X %2X %2X %2X %2X %2X %2X %2X %2X %2X", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3],rxpacket[4],rxpacket[5],rxpacket[6],rxpacket[7],rxpacket[8],rxpacket[9]);
+
+                            // log_i("Size: %d",size);
+
+                            if(size > 0){
+                                log_i("Pacote de leitura recebido. Valor lido (%d bytes): ",size); 
+
+                                uint32_t value;
+                                // log_i("bufferValue: %2X %2X %2X %2X", bufferValue[0],bufferValue[1],bufferValue[2],bufferValue[3]);
+
+                                //copia os bytes do buffer para uma variavei valor;
+                                //a copia e feita invertida pois o processador da esp e little-endian
+                                int aux = 0;
+                                for(int i = 3; i >= 0; i--){
+                                    *(&value + aux++) = bufferValue[i];
+                                }
+                                Serial.printf("Valor: %d\n",value);
+                            }
+
+                            else log_e("Erro na leitura do valor!");
+
+                            
+
+                            free(bufferValue);
+                            break;
+                        }
+                        case FCT_DESCRIPTION: {
+                            //mensagem de descrição
+                            break;
+                        }
                     }
                 }
-                loramesh.startReceiving();
+                else{ //end device
+                    //verifica o destino da mensagem
+                    switch (loramesh.lastpkt.fct){
+                        case FCT_BEACON:{
+                            uint8_t* rxpacket = loramesh.lastpkt.rxpacket;
+                            uint8_t len = loramesh.lastpkt.packetSize;
+                            uint32_t timestamp = loramesh.gettimestamp(rxpacket,len);
+                            node_init_sync(timestamp);
+                            log_i("Rx.seqnum: %d", loramesh.lastpkt.seqnum);
+                            nextstate = ST_TXDATA;
+                            break;
+                        }
+                        case FCT_WRITING:{
+                            //mensagem de escrita
+                            uint16_t seqnumber = loramesh.lastpkt.seqnum;
+                            uint8_t* rxpacket = loramesh.lastpkt.rxpacket;
+                            log_i("Requisição de escrita recebida! Rx.seqnumber: %d",seqnumber);
+
+                            //{src,dst,FCT,seqnumb,start,qtd,val,CRC}
+                            log_i("Pacote recebido: %2X %2X %2X %2X %2X %2X %2X %2X %2X", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3],rxpacket[4],rxpacket[5],rxpacket[6],rxpacket[7],rxpacket[8]);
+                            digitalWrite(pinLed,rxpacket[7]);
+
+                            break;
+                        }
+                        case FCT_READING:{
+                            uint16_t seqnumber = loramesh.lastpkt.seqnum;
+                            log_i("Requisição de leitura recebida! Rx.seqnumber: %d",seqnumber);
+                            nextstate = ST_TXDATA;
+                            //mensagem de leitura
+                            break;
+                        }
+                        case FCT_DESCRIPTION: {
+                            //mensagem de descrição
+                            break;
+                        }
+                    }
+                }
             }
             break;
         case ST_TXDATA: 
-            if ((loramesh.mydd.devtype == DEV_TYPE_ENDDEV) && (actualslot == loramesh.mydd.dataslot)) {
-                send_pct = 1;
-                nextstate = ST_RXWAIT; 
-            }
-            loramesh.startReceiving();
+            lastActivityMillis = millis();
+            send_pct = 1;
+            nextstate = ST_RXWAIT;
+            break;
+        case ST_STANDBY:
+            lastActivityMillis = millis();
+            //slepping mode
             break;
         default:
             break;
@@ -241,33 +277,55 @@ void sendTask(void* pvParameters) {
             send_pct = 0;
             if (loramesh.mydd.devtype == DEV_TYPE_ROUTER){
                 uint16_t lastmyseqnum = loramesh.getLastSeqNum();  
-                int ret = loramesh.sendPacketReq(lastscantime_ms);
-                if(ret != 0){
-                    log_i("Tx.seqnum=%d",lastmyseqnum);
-                    lastActivityMillis = millis();
-                } else{
-                    log_i("Falha no envio do beacon!");
+                if(actualslot == 0){
+                    uint8_t ret = loramesh.sendPacketReq(lastscantime_ms);
+                    if(ret > 0){
+                        log_i("Tx.seqnum= %d", lastmyseqnum);
+                        #if 1
+                            sprintf(display_line3,"Tx.seqnum = %d", lastmyseqnum);
+                            Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
+                        #endif
+                    }
+                    else{
+                        log_i("Falha no envio do beacon !");
+                    }
+                    
                 }
+                else if(actualslot == 2){
+                    uint8_t* pucaux = (uint8_t*) &lastmyseqnum;
+                    //frame de requisição que o route vai enviar
+                    //{SRC,DST,FCT,Seq numb,START,QTD PARAMETROS,CRC}
+                    uint8_t frame[] = {1,2,FCT_WRITING,*(pucaux+1),*(pucaux),1,1,1,BYTE_CRC};
+                    uint8_t frameSize = sizeof(frame);
+                    if(loramesh.sendPacket(frame,frameSize)) log_i("Requisição de escrita enviada. Aguardando resposta ...");
+                    else log_i("Falha no envio do frame !");
+                    
+                }
+                nextstate = ST_RXWAIT;
             } else {
+                //ed response
                 uint8_t *msg;
                 uint8_t msg_size;
-            
-                if (loramesh.mydd.dataslot == END_DEVICE_1_SLOT) {
-                    msg = msg_device1;
-                    msg_size = sizeof(msg_device1);
-                }else if (loramesh.mydd.dataslot == END_DEVICE_2_SLOT) {
-                    msg = msg_device2;
-                    msg_size = sizeof(msg_device2);
+                switch(loramesh.lastpkt.fct){
+                    case FCT_BEACON:{
+                        loramesh.sendPacketRes(1);
+                        nextstate = ST_RXWAIT;
+                        break;
+                    case FCT_READING:{
+                        //response frame
+                        //{SRC,DST,FCT,SEQ NUMBER,SIZE VALUE,VALUE,CRC};
+                        // uint32_t value = 230; // exemplo de leitura de um potenciometro
+                        uint8_t sizeValue = sizeof(valorPot); // valor lido pelo ed
+
+                        if (loramesh.sendPacketRes(1,sizeValue,valorPot)) log_i("Resposta enviada!");
+                        else log_e ("Falha no envio da resposta!");
+                        nextstate = ST_RXWAIT;
+                        break;
+                        
+                    }
+                    }
                 }
-                 else if(loramesh.mydd.dataslot == END_DEVICE_3_SLOT) {
-                    msg = msg_device3;
-                    msg_size = sizeof(msg_device3);
-                }
-            
-                //envia o pacote para o router (dstaddress = 1)
-                loramesh.sendPacketRes(1, msg[0]);
-                lastActivityMillis = millis();
-                Serial.println("Mensagem enviada");
+                
 
             }
         }
@@ -280,11 +338,16 @@ void LerPotenciometro(void* pvParameters) {
     // NOTA: Esta tarefa agora serve apenas para log local no ED.
     // O valor lido aqui não é mais enviado pela rede.
     for (;;) {
-        uint16_t leitura_completa = analogRead(PinPot);
+        uint32_t leitura_completa = analogRead(PinPot);
         valorPot = leitura_completa;
         TensaoDeSaida = (((float)valorPot / 4095.0) * 3.3);
         
         log_d("ValorPot (0-4095) = %d | Tensao de Saida = %.2fV", valorPot, TensaoDeSaida);
+
+        #if DISPLAY_ENABLE
+            sprintf(display_line3,"ValorPot: %.2f V",TensaoDeSaida);
+            Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
+        #endif
         
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
@@ -329,9 +392,9 @@ void setup() {
     xTaskCreatePinnedToCore(sendTask, "SendTask", 3072, NULL, 3, &Send_TaskHandle, 1);
     xTaskCreatePinnedToCore(watchdogTask, "WatchdogTask", 2048, NULL, 1, &Watchdog_TaskHandle, 1);
     
-    // if (loramesh.mydd.devtype == DEV_TYPE_ENDDEV) {
-    //     xTaskCreatePinnedToCore(LerPotenciometro, "LerPotenciometroTask", 2048, NULL, 1, &LerPotenciometro_TaskHandle, 1);
-    // }
+    if (loramesh.mydd.devtype == DEV_TYPE_ENDDEV) {
+        xTaskCreatePinnedToCore(LerPotenciometro, "LerPotenciometroTask", 2048, NULL, 1, &LerPotenciometro_TaskHandle, 1);
+    }
     Serial.println("--- Criacao de tarefas finalizada ---\n");
 }
 

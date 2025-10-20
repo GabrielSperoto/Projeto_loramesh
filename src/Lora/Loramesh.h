@@ -48,7 +48,7 @@ typedef struct {
     uint8_t dstaddress;
     uint8_t fct;
     uint16_t seqnum=0;
-    uint32_t timestamp;
+    // uint32_t timestamp;
     uint8_t packetSize;
     uint8_t rxpacket[BUFFER_SIZE];
 } strPacket;
@@ -59,7 +59,7 @@ typedef struct  {
     uint8_t  devtype;
     uint8_t  devaddr;
     uint8_t  dataslot;
-    uint8_t  seqnum;
+    uint16_t  seqnum;
 } strDevicedescription;
 
 // Fila para armazenar mensagens recebidas
@@ -73,10 +73,14 @@ typedef enum {
    DEV_TYPE_ROUTER=1,
    DEV_TYPE_ENDDEV
 } devicetype;
+
 typedef enum {
    FCT_BEACON=1,
    FCT_JOIN,
-   FCT_DATA
+   FCT_DATA,
+   FCT_DESCRIPTION,
+   FCT_READING,
+   FCT_WRITING
 } functioncode;
 
 typedef enum  {
@@ -84,7 +88,9 @@ typedef enum  {
     ST_RXWAIT,
     ST_RXDONE,
     ST_TXDATA,
-    ST_STANDBY
+    ST_STANDBY,
+    ST_TXREQUEST,
+    ST_RXRESPONSE
 }statemac;
 
 #if defined (__STM32F1__)
@@ -120,8 +126,13 @@ public:
     
   void restartRadio(void);
   int startReceiving(void);
-  uint8_t sendPacketRes(uint8_t dstaddr, uint32_t dtvalue);
+  
+
+  uint8_t sendPacketReq(uint8_t dst, uint8_t fct, uint8_t start, uint8_t qtdParametros);
   uint8_t sendPacketReq(long timestamp);
+  uint8_t sendPacketRes(uint8_t dst, uint8_t size, uint32_t value); //envio de uma resposta de leitura
+  uint8_t sendPacketRes(uint8_t dstaddr); //envio de uma resposta de beacon
+
 
   void setDioActionsForReceivePacket(void);
   void clearDioActions(void);
@@ -134,6 +145,9 @@ public:
   uint16_t getseqnum(uint8_t *packet,uint8_t len);
   uint16_t getLastSeqNum(void);
   uint16_t getLastPctSeqNum(void);
+  uint8_t getResponseCode(uint8_t* packet);
+  uint8_t getResponseValue(uint8_t* packet, uint8_t* responseBuffer, uint8_t buffersize);
+ 
 
   void clearBuffer(uint8_t *buffer, int size);
   bool getdevicedescription(void);
