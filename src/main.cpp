@@ -7,8 +7,9 @@
 #include "esp_log.h"
 
 // --- Variáveis Globais (Mantidas do seu código original) ---
-#define PinPot 37
-uint16_t valorPot = 0;
+#define PinPot 25
+#define pinLed 14
+uint32_t valorPot = 0;
 float TensaoDeSaida = 0;
 
 #if DISPLAY_ENABLE
@@ -190,7 +191,7 @@ void applicationTask(void* pvParameters) {
                                 log_i("Pacote de leitura recebido. Valor lido (%d bytes): ",size); 
 
                                 uint32_t value;
-                                log_i("bufferValue: %2X %2X %2X %2X", bufferValue[0],bufferValue[1],bufferValue[2],bufferValue[3]);
+                                // log_i("bufferValue: %2X %2X %2X %2X", bufferValue[0],bufferValue[1],bufferValue[2],bufferValue[3]);
 
                                 //copia os bytes do buffer para uma variavei valor;
                                 //a copia e feita invertida pois o processador da esp e little-endian
@@ -228,6 +229,14 @@ void applicationTask(void* pvParameters) {
                         }
                         case FCT_WRITING:{
                             //mensagem de escrita
+                            uint16_t seqnumber = loramesh.lastpkt.seqnum;
+                            uint8_t* rxpacket = loramesh.lastpkt.rxpacket;
+                            log_i("Requisição de escrita recebida! Rx.seqnumber: %d",seqnumber);
+
+                            //{src,dst,FCT,seqnumb,start,qtd,val,CRC}
+                            log_i("Pacote recebido: %2X %2X %2X %2X %2X %2X %2X %2X %2X", rxpacket[0],rxpacket[1],rxpacket[2],rxpacket[3],rxpacket[4],rxpacket[5],rxpacket[6],rxpacket[7],rxpacket[8]);
+                            digitalWrite(pinLed,rxpacket[7]);
+
                             break;
                         }
                         case FCT_READING:{
@@ -286,9 +295,9 @@ void sendTask(void* pvParameters) {
                     uint8_t* pucaux = (uint8_t*) &lastmyseqnum;
                     //frame de requisição que o route vai enviar
                     //{SRC,DST,FCT,Seq numb,START,QTD PARAMETROS,CRC}
-                    uint8_t frame[] = {1,2,FCT_READING,*(pucaux+1),*(pucaux),1,1,BYTE_CRC};
+                    uint8_t frame[] = {1,2,FCT_WRITING,*(pucaux+1),*(pucaux),1,1,1,BYTE_CRC};
                     uint8_t frameSize = sizeof(frame);
-                    if(loramesh.sendPacket(frame,frameSize)) log_i("Requisição de leitura enviada. Aguardando resposta ...");
+                    if(loramesh.sendPacket(frame,frameSize)) log_i("Requisição de escrita enviada. Aguardando resposta ...");
                     else log_i("Falha no envio do frame !");
                     
                 }
@@ -305,10 +314,10 @@ void sendTask(void* pvParameters) {
                     case FCT_READING:{
                         //response frame
                         //{SRC,DST,FCT,SEQ NUMBER,SIZE VALUE,VALUE,CRC};
-                        uint32_t value = 230; // exemplo de leitura de um potenciometro
-                        uint8_t sizeValue = sizeof(value);
+                        // uint32_t value = 230; // exemplo de leitura de um potenciometro
+                        uint8_t sizeValue = sizeof(valorPot); // valor lido pelo ed
 
-                        if (loramesh.sendPacketResponse(1,sizeValue,value)) log_i("Resposta enviada!");
+                        if (loramesh.sendPacketRes(1,sizeValue,valorPot)) log_i("Resposta enviada!");
                         else log_e ("Falha no envio da resposta!");
                         nextstate = ST_RXWAIT;
                         break;
@@ -329,11 +338,16 @@ void LerPotenciometro(void* pvParameters) {
     // NOTA: Esta tarefa agora serve apenas para log local no ED.
     // O valor lido aqui não é mais enviado pela rede.
     for (;;) {
-        uint16_t leitura_completa = analogRead(PinPot);
+        uint32_t leitura_completa = analogRead(PinPot);
         valorPot = leitura_completa;
         TensaoDeSaida = (((float)valorPot / 4095.0) * 3.3);
         
         log_d("ValorPot (0-4095) = %d | Tensao de Saida = %.2fV", valorPot, TensaoDeSaida);
+
+        #if DISPLAY_ENABLE
+            sprintf(display_line3,"ValorPot: %.2f V",TensaoDeSaida);
+            Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
+        #endif
         
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
@@ -378,9 +392,9 @@ void setup() {
     xTaskCreatePinnedToCore(sendTask, "SendTask", 3072, NULL, 3, &Send_TaskHandle, 1);
     xTaskCreatePinnedToCore(watchdogTask, "WatchdogTask", 2048, NULL, 1, &Watchdog_TaskHandle, 1);
     
-    // if (loramesh.mydd.devtype == DEV_TYPE_ENDDEV) {
-    //     xTaskCreatePinnedToCore(LerPotenciometro, "LerPotenciometroTask", 2048, NULL, 1, &LerPotenciometro_TaskHandle, 1);
-    // }
+    if (loramesh.mydd.devtype == DEV_TYPE_ENDDEV) {
+        xTaskCreatePinnedToCore(LerPotenciometro, "LerPotenciometroTask", 2048, NULL, 1, &LerPotenciometro_TaskHandle, 1);
+    }
     Serial.println("--- Criacao de tarefas finalizada ---\n");
 }
 

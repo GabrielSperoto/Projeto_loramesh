@@ -640,9 +640,9 @@ uint8_t LoRaClass::sendPacketReq(long timestamp)
 
 }
 
-//função implementada para enviar valores inteiros (2 bytes)
+//função implementada para enviar valores inteiros (4 bytes)
 
-uint8_t LoRaClass::sendPacketResponse(uint8_t dst, uint8_t size, uint32_t value){
+uint8_t LoRaClass::sendPacketRes(uint8_t dst, uint8_t size, uint32_t value){
   uint8_t buffer[BUFFER_SIZE];
   uint8_t* pucaux = (uint8_t*) &lastpkt.seqnum;
   uint8_t aux = 0;
