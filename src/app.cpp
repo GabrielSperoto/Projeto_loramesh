@@ -1,5 +1,6 @@
 #include "Arduino.h"
 #include "devconfig.h"
+#include "main.h"
 #include "heltec.h"
 #include "Lora/loramesh.h"
 #include <Wire.h>
@@ -25,8 +26,10 @@ float TensaoDeSaida = 0;
 
 bool ledtoogle = 0;
 
-
 void applicationTask(void* pvParameters) {
+    TxMessage_t txmsg;
+    RxMessage_t rxMsg;
+
     while (true) {
         slottimecontrol();
         
@@ -45,14 +48,23 @@ void applicationTask(void* pvParameters) {
         switch (nextstate) {
             case ST_TXBEACON:
                 if ((loramesh.mydd.devtype == DEV_TYPE_ROUTER) && (actualslot == 0)) {
-                    send_pct = 1;
+                    txmsg.dst = 0;
+                    txmsg.function = FCT_BEACON;
+                    txmsg.size = 0;
+                    xQueueSend(txQueue, &txmsg, 0);
+
                     lastActivityMillis = millis();
                     nextstate = ST_STANDBY; 
                 }
                 break;
             case ST_RXWAIT:
                 //manipula os pacotes recebidos pelo router e pelo ed
-                log_i("Rxwait =%d",loramesh.lastpkt.packetSize);
+                if (xQueueReceive(rxQueue, &rxMsg, 0) == pdTRUE) {
+                    log_i("App recebeu pacote de %d func=%d size=%d RSSI=%d",
+                        rxMsg.src, rxMsg.function, rxMsg.size, rxMsg.rssi);
+                    // aqui você decide o que fazer com os dados recebidos
+                }
+
                 if(loramesh.receivePacket()){
                     lastActivityMillis = millis();
                     if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
@@ -158,6 +170,23 @@ void applicationTask(void* pvParameters) {
             case ST_TXDATA: 
                 lastActivityMillis = millis();
                 //achq que aqui eu deveria montar o frame especifico e colocar na fila...
+                if (loramesh.mydd.devtype == DEV_TYPE_ROUTER){
+                    txmsg.dst = 2;
+                    txmsg.function = FCT_READING;
+                    txmsg.size = 0;
+                    xQueueSend(txQueue, &txmsg, 0);                    
+                }
+                else{ //end device
+                    uint16_t value=1234;
+                    uint8_t *pucaux = (uint8_t *) &value;
+                    txmsg.dst = 1;
+                    txmsg.function = FCT_READING;
+                    txmsg.size = sizeof(value);
+                    txmsg.payload[0] = *pucaux++;
+                    txmsg.payload[1] = *pucaux;
+                    xQueueSend(txQueue, &txmsg, 0);
+
+                }
                 send_pct = 1;
                 nextstate = ST_STARTRX;
                 break;

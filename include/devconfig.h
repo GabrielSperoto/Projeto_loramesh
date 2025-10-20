@@ -88,7 +88,7 @@
 V2 -  
  Allowed values range from -3 to 15 dBm (RFO pin) or +2 to +17 dBm (PA_BOOST pin).
 */
-#define LORA_TRANSMIT_POWER 2   //valor minimo
+#define LORA_TRANSMIT_POWER 2  //valor minimo
 
 /* Gain for lora. Defaults to 1.
    goes from 0 to 1 where 0 is the lowest gain and 1 is the highest gain 

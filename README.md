@@ -10,7 +10,8 @@ Descricao:
 V1_01xx
    - Merge com a versao do Gabriel /Natan com tarefas de aplicacao e sendtask em arquivos separados.
    - esta versao nao funciona a resposta do escravo para o mestre na janela de tmepo especificada.
- 
+   - inclusao do mecanismo de queue entre as tarefas
+
 
 V1_01
    - Esta versão suporta V2 e V3, bastando alterar o platformio.ini. Esta funcionando as duas placas misturadas (ou seja, nao importa se eh V2 ou V3 elas conseguem enviar e receber para qualquer placa)

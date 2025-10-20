@@ -681,16 +681,18 @@ uint8_t LoRaClass::sendData(uint8_t dstaddr,uint16_t value)
 
 //função implementada para enviar valores inteiros (2 bytes)
 
-uint8_t LoRaClass::sendPacketResponse(uint8_t dst, uint8_t size, uint16_t value){
+uint8_t LoRaClass::sendPacketResponse(uint8_t dst, uint8_t size, uint8_t *buf){
   uint8_t buffer[BUFFER_SIZE];
-  uint8_t* pucaux = (uint8_t*) &value;
-  uint8_t aux = 0;
+  uint8_t* pucaux = buf;
+  uint8_t aux = 0, i=0;
 
   buffer[aux++] = mydd.devaddr;
   buffer[aux++] = dst;
   buffer[aux++] = FCT_READING;
-  buffer[aux++] = *(pucaux+1);
-  buffer[aux++] = *(pucaux);
+  
+  for (i=0;i<size;i++){
+      buffer[aux++] = *(pucaux++);
+  }
   buffer[aux++] = size;
 //  pucaux = (uint8_t*) &value;
 //  buffer[aux++] = *(pucaux+3);
