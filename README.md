@@ -1,3 +1,3 @@
 # Projeto_loramesh
-<h2>Branch destinada somente para testes</h2>
+<h2>Projeto em desenvolvimento...</h2>
 
