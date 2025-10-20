@@ -50,8 +50,8 @@ volatile bool operationDone = false;
 // 0x1C65
 #if defined ( WIFI_LoRa_32_V2 )
 strDevicedescription devid[]={
-   {0xACFD,DEV_TYPE_ROUTER,1,0},
-   {0xF482,DEV_TYPE_ENDDEV,2,2},
+   {0xD0A9,DEV_TYPE_ROUTER,1,0},
+   {0xF095,DEV_TYPE_ENDDEV,2,2},
    {0xCC7F,DEV_TYPE_ENDDEV,3,3},
    {0X8096,DEV_TYPE_ENDDEV,4,4}
 };
@@ -115,6 +115,12 @@ void setFlagDetected(void) {
 // ISR for handling LoRa reception interrupt
 volatile bool messageReceived = false;
 
+void LoRaClass::ClearRadioIRQs(){
+
+  writeRegister(RADIOLIB_SX127X_REG_IRQ_FLAGS, 0xFF); // clear all IRQs
+  writeRegister(RADIOLIB_SX127X_REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_CONTINUOUS);  
+} 
+
 void onReceiveInterrupt() {
   messageReceived = true;
 }
@@ -126,7 +132,7 @@ int LoRaClass::begin()
   uint8_t sf = LORA_SF; 
   uint8_t cr = LORA_CR; 
   int8_t power = LORA_TRANSMIT_POWER; 
-  uint16_t preambleLength = 8; 
+  uint16_t preambleLength = 12; 
   uint8_t gain = LORA_GAIN;
   uint8_t ret=0;
   uint8_t syncWord=0;
@@ -208,7 +214,10 @@ int LoRaClass::begin()
     // start listening for LoRa packets on this node
     radio.setDio0Action(onReceiveInterrupt, RISING);
 
+    uint32_t rx_timeout = 2000;
+    int res = radio.startReceive(rx_timeout);
     state = radio.startReceive();
+
     if (state == RADIOLIB_ERR_NONE) {
       log_i("Starting receiving!");
     } 
@@ -263,14 +272,19 @@ void LoRaClass::restartRadio() {
     log_e("Restarting radio DONE");
 }
 
-int LoRaClass::startReceiving() {
+int LoRaClass::startReceiving(uint32_t timeout) {
     setDioActionsForReceivePacket();
 
-    int res = radio.startReceive();
-    if (res != 0) {
-        log_e("Starting receiving gave error: %d", res);
-        restartRadio();
-        return startReceiving();
+    int res = radio.startReceive(timeout);
+    if (res != RADIOLIB_ERR_NONE) {
+        if (res == RADIOLIB_ERR_RX_TIMEOUT){
+          log_e("Starting receiving timeout");
+        }
+        else{
+          log_e("Starting receiving gave error: %d", res);
+          restartRadio();
+        }
+
     }
     return res;
 }
@@ -598,7 +612,7 @@ uint8_t LoRaClass::sendPacketReq(uint8_t dst, uint8_t fct, uint8_t start, uint8_
     return 0;
 }
 
-uint8_t LoRaClass::sendPacketReq(long timestamp)
+uint8_t LoRaClass::sendBeacon(long timestamp)
 {
     uint8_t ret=0;
     uint8_t pos=0;
@@ -619,47 +633,87 @@ uint8_t LoRaClass::sendPacketReq(long timestamp)
     buf[pos++] =  *(pucaux+0);
     buf[pos++] =  BYTE_CRC;
 
-
-#if 1
     ret = sendPacket(buf,pos);
     if (ret){
-        //log_i("REQ [%d] = %2x %2x %2x %2x %2x", pos, buf[0], buf[1],buf[2],buf[3], buf[4]);
+       //vTaskDelay(10 / portTICK_PERIOD_MS);
+       //int res = startReceiving(0);
+       //if (res > 0){
+       //   log_e("Error startReceiving=%d",res);
+       //   return 0;
+       //}
+       log_i("BEACON [%d] = %2x %2x %2x %2x %2x", pos, buf[0], buf[1],buf[2],buf[3], buf[4]);
        return pos;
     }
     else
        return 0;   
-#else
-  loramesh.beginPacket();
-  //print: adiciona os dados no pacote
-  for (int i = 0; i < sizeof(frame1); i++) {
-      loramesh.write((uint8_t)txpacket[i]);
-  }
-  loramesh.endPacket(); //retorno= 1:sucesso | 0: falha
-
-#endif   
-
 }
 
-//função implementada para enviar valores inteiros (4 bytes)
 
-uint8_t LoRaClass::sendPacketRes(uint8_t dst, uint8_t size, uint32_t value){
+uint8_t LoRaClass::sendData(uint8_t dstaddr,uint16_t value)
+{
+    uint8_t ret=0;
+    uint8_t pos=0;
+    uint8_t buf[BUFFER_SIZE];
+    uint8_t *pucaux = (uint8_t *) &value;
+
+    buf[pos++] =  mydd.devaddr;
+    buf[pos++] =  dstaddr;
+    buf[pos++] =  FCT_READING;
+    buf[pos++] =  *(pucaux+1);
+    buf[pos++] =  *(pucaux+0);
+    buf[pos++] =  BYTE_CRC;
+
+    ret = sendPacket(buf,pos);
+    if (ret){
+       //vTaskDelay(20 / portTICK_PERIOD_MS);
+       //uint32_t rx_timeout = (mydd.devtype == DEV_TYPE_ROUTER) ? 0 : 2000; 
+       //int res= startReceiving(rx_timeout);
+       //if (res > 0){
+       //   log_e("Error startReceiving=%d",res);
+       //   return 0;
+       //}
+       log_i("Data.REQ [%d] = %2x %2x %2x %2x %2x", pos, buf[0], buf[1],buf[2],buf[3], buf[4]);
+       return pos;
+    }
+    else
+       return 0;   
+}
+
+//função implementada para enviar valores inteiros (2 bytes)
+
+uint8_t LoRaClass::sendPacketResponse(uint8_t dst, uint8_t size, uint16_t value){
   uint8_t buffer[BUFFER_SIZE];
-  uint8_t* pucaux = (uint8_t*) &lastpkt.seqnum;
+  uint8_t* pucaux = (uint8_t*) &value;
   uint8_t aux = 0;
+
   buffer[aux++] = mydd.devaddr;
   buffer[aux++] = dst;
   buffer[aux++] = FCT_READING;
   buffer[aux++] = *(pucaux+1);
   buffer[aux++] = *(pucaux);
   buffer[aux++] = size;
-  pucaux = (uint8_t*) &value;
-  buffer[aux++] = *(pucaux+3);
-  buffer[aux++] = *(pucaux+2);
-  buffer[aux++] = *(pucaux+1);
-  buffer[aux++] = *(pucaux);
+//  pucaux = (uint8_t*) &value;
+//  buffer[aux++] = *(pucaux+3);
+//  buffer[aux++] = *(pucaux+2);
+//  buffer[aux++] = *(pucaux+1);
+//  buffer[aux++] = *(pucaux);
   buffer[aux++] = BYTE_CRC;
-  if(loramesh.sendPacket(buffer,aux)) return 1;
-  return 0;
+
+  if(loramesh.sendPacket(buffer,aux)){
+     vTaskDelay(20 / portTICK_PERIOD_MS);
+
+     uint32_t rx_timeout = (mydd.devtype == DEV_TYPE_ROUTER) ? 0 : 2000; 
+     int res= startReceiving(rx_timeout);
+     if (res > 0){
+       log_e("Error startReceiving=%d",res);
+       return 0;
+     }
+
+     log_i("Data.RES [%d] = %2x %2x %2x %2x %2x", aux, buffer[0], buffer[1],buffer[2],buffer[3], buffer[4]);
+     return 1;
+  }
+  else
+    return 0;
 }
 
 uint8_t LoRaClass::sendPacketRes(uint8_t dstaddr)
@@ -679,7 +733,16 @@ uint8_t LoRaClass::sendPacketRes(uint8_t dstaddr)
 #if 1
     ret = sendPacket(buf,pos);
     if (ret){
-        //log_i("RES[%d]=%2x %2x %2x %2x %2x %2x %2x %2x", pos, buf[0], buf[1],buf[2],buf[3], buf[4], buf[5],buf[6],buf[7]);
+        vTaskDelay(20 / portTICK_PERIOD_MS);
+
+        uint32_t rx_timeout = (mydd.devtype == DEV_TYPE_ROUTER) ? 0 : 2000; 
+        int res= startReceiving(rx_timeout);
+        if (res > 0){
+          log_e("Error startReceiving=%d",res);
+          return 0;
+        }
+
+       log_i("RES[%d]=%2x %2x %2x %2x %2x %2x %2x %2x", pos, buf[0], buf[1],buf[2],buf[3], buf[4], buf[5],buf[6],buf[7]);
        return pos;
     }
     else
@@ -717,7 +780,6 @@ bool LoRaClass::receivePacket()
 #else // V2
     packetSize = loramesh.parsePacket(0);
     lastpkt.packetSize = packetSize;
-    // log_i("Packetsize: %d",lastpkt.packetSize);
     if (packetSize) {
         while (loramesh.available() && len < BUFFER_SIZE - 1) {
             lastpkt.rxpacket[len++] = (char)loramesh.read(); // Lê o pacote byte a byte
@@ -726,6 +788,7 @@ bool LoRaClass::receivePacket()
 
         // verifica o srcaddress e dstaddress do pacote
         ret = getaddress((uint8_t *)lastpkt.rxpacket,packetSize);
+        log_i("Rx Pktsize: %d",lastpkt.packetSize);
         
         //verifica se o pacote recebido nao eh o mesmo que acabou de ser enviado
         if ((ret) && ((lastpkt.srcaddress != mydd.devaddr))) {
@@ -734,7 +797,7 @@ bool LoRaClass::receivePacket()
             // lastpkt.timestamp = gettimestamp((uint8_t *)lastpkt.rxpacket,packetSize);
             retcrc = checkcrc((uint8_t *)lastpkt.rxpacket,packetSize);
 
-            //log_i("Rx len=%d seqnum=%d timestamp=%d retcrc=%d",packetSize, lastpkt.seqnum, lastpkt.timestamp,retcrc);
+            log_i("Rx[%d] = %d %d %d %d",lastpkt.packetSize, lastpkt.srcaddress, lastpkt.dstaddress, lastpkt.fct,lastpkt.seqnum);
 
             if ((retcrc == 1) && ((lastpkt.dstaddress == mydd.devaddr) || (lastpkt.dstaddress == BROADCAST_ADDR))) {
                 return 1;
@@ -885,8 +948,11 @@ bool LoRaClass::sendPacket(uint8_t* p,uint8_t len) {
     //Blocking transmit, it is necessary due to deleting the packet after sending it. 
     int transmissionState = radio.transmit(p, len,1);
 
+    ///RFF
+    //log_i("SEND [%d] = %2x %2x %2x %2x %2x", len, p[0], p[1],p[2],p[3], p[4]);
+   
     //Start receiving again after sending a packet
-    startReceiving();
+    //startReceiving();
 
    if (transmissionState == RADIOLIB_ERR_NONE) {
     return true;
@@ -1043,248 +1109,6 @@ int LoRaClass::peek()
 
 void LoRaClass::flush()
 {
+  ;
 }
 
-//======================== NOT USED ============================
-
-#if 0
-float LoRaClass::packetSnr()
-{
-  return (((int8_t)readRegister(RADIOLIB_SX127X_REG_RSSI_VALUE) +2) >> 2);
-}
-
-
-void LoRaClass::onReceive(void(*callback)(int))
-{
-  _onReceive = callback;
-
-  if (callback) {
-    writeRegister(RADIOLIB_SX127X_REG_DIO_MAPPING_1, 0x00);
-    attachInterrupt(digitalPinToInterrupt(_dio0), LoRaClass::onDio0Rise, RISING);
-//    attachInterrupt(digitalPinToInterrupt(_dio0), LoRaClass::onDio0Rise, RISING);
-  } else {
-    detachInterrupt(digitalPinToInterrupt(_dio0));
-  }
-}
-
-void LoRaClass::receive(int size)
-{
-  if (size > 0) {
-    implicitHeaderMode();
-    writeRegister(RADIOLIB_SX127X_REG_PAYLOAD_LENGTH, size & 0xff);
-  } else {
-    explicitHeaderMode();
-  }
-
-  writeRegister(RADIOLIB_SX127X_REG_OP_MODE, MODE_LONG_RANGE_MODE | MODE_RX_CONTINUOUS);
-}
-
-void LoRaClass::setTxPower(int8_t power, int8_t outputPin)
-{
-	  uint8_t paConfig = 0;
-	  uint8_t paDac = 0;
-
-	  paConfig = readRegister( RADIOLIB_SX127X_REG_PA_CONFIG );
-	  paDac = readRegister( REG_PADAC );
-
-	  paConfig = ( paConfig & RF_PACONFIG_PASELECT_MASK ) | outputPin;
-	  paConfig = ( paConfig & RF_PACONFIG_MAX_POWER_MASK ) | 0x70;
-
-	  if( ( paConfig & RF_PACONFIG_PASELECT_PABOOST ) == RF_PACONFIG_PASELECT_PABOOST )
-	  {
-	    if( power > 17 )
-	    {
-	      paDac = ( paDac & RF_PADAC_20DBM_MASK ) | RF_PADAC_20DBM_ON;
-	    }
-	    else
-	    {
-	      paDac = ( paDac & RF_PADAC_20DBM_MASK ) | RF_PADAC_20DBM_OFF;
-	    }
-	    if( ( paDac & RF_PADAC_20DBM_ON ) == RF_PADAC_20DBM_ON )
-	    {
-	      if( power < 5 )
-	      {
-	        power = 5;
-	      }
-	      if( power > 20 )
-	      {
-	        power = 20;
-	      }
-	      paConfig = ( paConfig & RF_PACONFIG_OUTPUTPOWER_MASK ) | ( uint8_t )( ( uint16_t )( power - 5 ) & 0x0F );
-	    }
-	    else
-	    {
-	      if( power < 2 )
-	      {
-	        power = 2;
-	      }
-	      if( power > 17 )
-	      {
-	        power = 17;
-	      }
-	      paConfig = ( paConfig & RF_PACONFIG_OUTPUTPOWER_MASK ) | ( uint8_t )( ( uint16_t )( power - 2 ) & 0x0F );
-	    }
-	  }
-	  else
-	  {
-	    if( power < -1 )
-	    {
-	      power = -1;
-	    }
-	    if( power > 14 )
-	    {
-	      power = 14;
-	    }
-
-	    paConfig = ( paConfig & RF_PACONFIG_OUTPUTPOWER_MASK ) | ( uint8_t )( ( uint16_t )( power + 1 ) & 0x0F );
-	  }
-	  writeRegister( RADIOLIB_SX127X_REG_PA_CONFIG, paConfig );
-	  writeRegister( REG_PADAC, paDac );
-}
-
-void LoRaClass::setFrequency(long frequency)
-{
-  _frequency = frequency;
-
-  uint64_t frf = ((uint64_t)frequency << 19) / 32000000;
-  writeRegister(RADIOLIB_SX127X_REG_FRF_MSB, (uint8_t)(frf >> 16));
-  writeRegister(RADIOLIB_SX127X_REG_FRF_MID, (uint8_t)(frf >> 8));
-  writeRegister(RADIOLIB_SX127X_REG_FRF_LSB, (uint8_t)(frf >> 0));
-}
-
-void LoRaClass::setSpreadingFactor(int sf)
-{
-  if (sf < 6) {
-  	sf = 6; 
-	}
-  else if (sf > 12) {
-  	sf = 12; 
-  	}
-  if (sf == 6) {
-    writeRegister(RADIOLIB_SX127X_REG_DETECT_OPTIMIZE, 0xc5);
-    writeRegister(RADIOLIB_SX127X_REG_DETECTION_THRESHOLD, 0x0c);
-  } else {
-    writeRegister(RADIOLIB_SX127X_REG_DETECT_OPTIMIZE, 0xc3);
-    writeRegister(RADIOLIB_SX127X_REG_DETECTION_THRESHOLD, 0x0a);
-  }
-
-  writeRegister(RADIOLIB_SX127X_REG_MODEM_CONFIG_2, (readRegister(RADIOLIB_SX127X_REG_MODEM_CONFIG_2) & 0x0f) | ((sf << 4) & 0xf0));
-
-}
-
-void LoRaClass::setSignalBandwidth(long sbw)
-{
-  int bw;
-
-  if (sbw <= 7.8E3) { bw = 0; }
-  else if (sbw <= 10.4E3) { bw = 1; }
-  else if (sbw <= 15.6E3) { bw = 2; }
-  else if (sbw <= 20.8E3) { bw = 3; }
-  else if (sbw <= 31.25E3) { bw = 4; }
-  else if (sbw <= 41.7E3) { bw = 5; }
-  else if (sbw <= 62.5E3) { bw = 6; }
-  else if (sbw <= 125E3) { bw = 7; }
-  else if (sbw <= 250E3) { bw = 8; }
-  else /*if (sbw <= 250E3)*/ { bw = 9; }
-
-  writeRegister(RADIOLIB_SX127X_REG_MODEM_CONFIG_1,(readRegister(RADIOLIB_SX127X_REG_MODEM_CONFIG_1) & 0x0f) | (bw << 4));
-}
-
-void LoRaClass::setCodingRate4(int denominator)
-{
-  if (denominator < 5) {
-    denominator = 5;
-  } else if (denominator > 8) {
-    denominator = 8;
-  }
-  int cr = denominator - 4;
-
-  writeRegister(RADIOLIB_SX127X_REG_MODEM_CONFIG_1, (readRegister(RADIOLIB_SX127X_REG_MODEM_CONFIG_1) & 0xf1) | (cr << 1));
-}
-
-void LoRaClass::setPreambleLength(long length)
-{
-  writeRegister(RADIOLIB_SX127X_REG_PREAMBLE_MSB, (uint8_t)(length >> 8));
-  writeRegister(RADIOLIB_SX127X_REG_PREAMBLE_LSB, (uint8_t)(length >> 0));
-}
-
-void LoRaClass::setSyncWord(int sw)
-{
-  writeRegister(RADIOLIB_SX127X_REG_SYNC_WORD, sw);
-}
-void LoRaClass::enableRxInvertIQ()
-{
-  writeRegister( RADIOLIB_SX127X_REG_INVERT_IQ, ( ( readRegister( RADIOLIB_SX127X_REG_INVERT_IQ ) & RFLR_INVERTIQ_TX_MASK & RFLR_INVERTIQ_RX_MASK ) | RFLR_INVERTIQ_RX_ON | RFLR_INVERTIQ_TX_OFF ) );
-  writeRegister( RADIOLIB_SX127X_REG_INVERT_IQ2, RFLR_INVERTIQ2_ON );
-}
-
-void LoRaClass::disableInvertIQ()
-{
-  writeRegister( RADIOLIB_SX127X_REG_INVERT_IQ, ( ( readRegister( RADIOLIB_SX127X_REG_INVERT_IQ ) & RFLR_INVERTIQ_TX_MASK & RFLR_INVERTIQ_RX_MASK ) | RFLR_INVERTIQ_RX_OFF | RFLR_INVERTIQ_TX_OFF ) );
-  writeRegister( RADIOLIB_SX127X_REG_INVERT_IQ2, RFLR_INVERTIQ2_OFF );
-}
-
-void LoRaClass::enableInvertIQ()
-{
-  writeRegister( RADIOLIB_SX127X_REG_INVERT_IQ, ( ( readRegister( RADIOLIB_SX127X_REG_INVERT_IQ ) & RFLR_INVERTIQ_TX_MASK & RFLR_INVERTIQ_RX_MASK ) | RFLR_INVERTIQ_RX_ON | RFLR_INVERTIQ_TX_ON ) );
-  writeRegister( RADIOLIB_SX127X_REG_INVERT_IQ2, RFLR_INVERTIQ2_ON );
-}
-
-byte LoRaClass::random()
-{
-  return readRegister(RADIOLIB_SX127X_REG_RSSI_WIDEBAND);
-}
-
-void LoRaClass::setSPIFrequency(uint32_t frequency)
-{
-  _spiSettings = SPISettings(frequency, MSBFIRST, SPI_MODE0);
-}
-
-void LoRaClass::dumpRegisters(Stream& out)
-{
-  for (int i = 0; i < 128; i++) {
-    out.print("0x");
-    out.print(i, HEX);
-    out.print(": 0x");
-    out.println(readRegister(i), HEX);
-  }
-}
-
-
-void LoRaClass::handleDio0Rise()
-{
-  int irqFlags = readRegister(RADIOLIB_SX127X_REG_IRQ_FLAGS);
-  // clear IRQ's
-  writeRegister(RADIOLIB_SX127X_REG_IRQ_FLAGS, irqFlags);
-#if defined(WIFI_LoRa_32_V3) 
-  if ((irqFlags & RADIOLIB_SX126X_IRQ_CRC_ERR) == 0) {
-#else
-  if ((irqFlags & IRQ_PAYLOAD_CRC_ERROR_MASK) == 0) {
-#endif    
-    // received a packet
-    _packetIndex = 0;
-    // read packet length
-    int packetLength = _implicitHeaderMode ? readRegister(RADIOLIB_SX127X_REG_PAYLOAD_LENGTH) : readRegister(RADIOLIB_SX127X_REG_RX_NB_BYTES);
-    // set FIFO address to current RX address
-    writeRegister(RADIOLIB_SX127X_REG_FIFO_ADDR_PTR, readRegister(RADIOLIB_SX127X_REG_FIFO_RX_CURRENT_ADDR));
-    if (_onReceive) { _onReceive(packetLength); }
-    // reset FIFO address
-    writeRegister(RADIOLIB_SX127X_REG_FIFO_ADDR_PTR, 0);
-  }
-}
-
-
-
-void LoRaClass::enableTxInvertIQ()
-{
-  writeRegister( RADIOLIB_SX127X_REG_INVERT_IQ, ( ( readRegister( RADIOLIB_SX127X_REG_INVERT_IQ ) & RFLR_INVERTIQ_TX_MASK & RFLR_INVERTIQ_RX_MASK ) | RFLR_INVERTIQ_RX_OFF | RFLR_INVERTIQ_TX_ON ) );
-  writeRegister( RADIOLIB_SX127X_REG_INVERT_IQ2, RFLR_INVERTIQ2_ON );
-}
-
-
-void LoRaClass::onDio0Rise()
-{
-  loramesh.handleDio0Rise();
-}
-
-#endif

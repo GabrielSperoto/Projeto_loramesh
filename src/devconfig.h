@@ -45,7 +45,7 @@
 
 #define MAX_PACKET_SIZE  30
 
-#define MAX_SLOTS   4
+#define MAX_SLOTS   5
 #define BEACON_SLOT 0 
 
 //Intervalo entre os envios
