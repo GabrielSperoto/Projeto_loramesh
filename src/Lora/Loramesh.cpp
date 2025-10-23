@@ -50,7 +50,7 @@ volatile bool operationDone = false;
 // 0x1C65
 #if defined ( WIFI_LoRa_32_V2 )
 strDevicedescription devid[]={
-   {0xD0A9,DEV_TYPE_ROUTER,1,0},
+   {0xACFD,DEV_TYPE_ROUTER,1,0},
    {0xF095,DEV_TYPE_ENDDEV,2,2},
    {0xCC7F,DEV_TYPE_ENDDEV,3,3},
    {0X8096,DEV_TYPE_ENDDEV,4,4}
@@ -131,7 +131,7 @@ int LoRaClass::begin()
   float bw = LORA_BW; 
   uint8_t sf = LORA_SF; 
   uint8_t cr = LORA_CR; 
-  int8_t power = LORA_TRANSMIT_POWER; 
+  uint8_t power = LORA_TRANSMIT_POWER; 
   uint16_t preambleLength = 12; 
   uint8_t gain = LORA_GAIN;
   uint8_t ret=0;
@@ -681,16 +681,18 @@ uint8_t LoRaClass::sendData(uint8_t dstaddr,uint16_t value)
 
 //função implementada para enviar valores inteiros (2 bytes)
 
-uint8_t LoRaClass::sendPacketResponse(uint8_t dst, uint8_t size, uint16_t value){
+uint8_t LoRaClass::sendPacketResponse(uint8_t dst, uint8_t size, uint8_t *buf){
   uint8_t buffer[BUFFER_SIZE];
-  uint8_t* pucaux = (uint8_t*) &value;
-  uint8_t aux = 0;
+  uint8_t* pucaux = buf;
+  uint8_t aux = 0, i=0;
 
   buffer[aux++] = mydd.devaddr;
   buffer[aux++] = dst;
   buffer[aux++] = FCT_READING;
-  buffer[aux++] = *(pucaux+1);
-  buffer[aux++] = *(pucaux);
+  
+  for (i=0;i<size;i++){
+      buffer[aux++] = *(pucaux++);
+  }
   buffer[aux++] = size;
 //  pucaux = (uint8_t*) &value;
 //  buffer[aux++] = *(pucaux+3);

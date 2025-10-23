@@ -1,10 +1,13 @@
 #include "Arduino.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
 #include "devconfig.h"
 #include "heltec.h"
 #include "Lora/loramesh.h"
 #include <Wire.h>
 #include <RadioLib.h>
 #include "esp_log.h"
+#include "main.h"
 
 #if DISPLAY_ENABLE
 #include "OLED/SSD1306.h"
@@ -26,14 +29,13 @@ char display_line2[20];
 char display_line3[20];
 #endif
 
-uint16_t idx_response = 0;
+QueueHandle_t txQueue;    //App transmite para comunicacao
+QueueHandle_t rxQueue;    //Comunicacao responde para App
 
+uint16_t idx_response = 0;
 
 uint32_t lastActivityMillis = 0;
 
-void applicationTask(void* pvParameters);
-void sendTask(void* pvParameters);
-void initcomm(void);
 
 void displayline(uint8_t line, char *pucMsg, ...) {
 
@@ -87,6 +89,15 @@ void setup() {
 
     Heltec.begin();
     loramesh.begin();
+
+    txQueue = xQueueCreate(10, sizeof(TxMessage_t));
+    if (txQueue == NULL) 
+        Serial.println("Falha ao criar fila txQueue!");
+
+    rxQueue = xQueueCreate(10, sizeof(RxMessage_t));
+    if (rxQueue == NULL) 
+        Serial.println("Falha ao criar fila rxQueue!");
+
     lastActivityMillis = millis();
 
     initcomm();
@@ -95,14 +106,14 @@ void setup() {
         Heltec.DisplayClear();
         if (loramesh.mydd.devtype == DEV_TYPE_ROUTER) {
             //sprintf(display_line1, "RT=%x ", loramesh.mydd.devserialnumber);
-            sprintf(display_line1, "RT.ADDR=%x ", loramesh.mydd.devaddr);
+            sprintf(display_line1, "RT = %x", loramesh.mydd.devserialnumber);
             Heltec.DisplayShow1(display_line1);
         } else {
             //sprintf(display_line1, "ED=%x ", loramesh.mydd.devserialnumber);
-            sprintf(display_line1, "ED.ADDR=%x ", loramesh.mydd.devaddr);
+            sprintf(display_line1, "ED = %x", loramesh.mydd.devserialnumber);
             Heltec.DisplayShow1(display_line1);
         }
-        sprintf(display_line2, "B=", loramesh.mydd.devaddr);
+        sprintf(display_line2, "ADD =", loramesh.mydd.devaddr);
         Heltec.DisplayShow2(display_line2);
     #endif
 
@@ -111,7 +122,7 @@ void setup() {
 
     // CORREÇÃO: Pilhas com tamanhos seguros para evitar crashes
     xTaskCreatePinnedToCore(applicationTask, "ApplicationTask", 4096, NULL, 3, &App_TaskHandle, 1);
-    xTaskCreatePinnedToCore(sendTask, "SendTask", 3072, NULL, 3, &Send_TaskHandle, 1);
+    xTaskCreatePinnedToCore(CommTask, "CommTask", 3072, NULL, 3, &Send_TaskHandle, 1);
     xTaskCreatePinnedToCore(watchdogTask, "WatchdogTask", 2048, NULL, 1, &Watchdog_TaskHandle, 1);
     
     // if (loramesh.mydd.devtype == DEV_TYPE_ENDDEV) {

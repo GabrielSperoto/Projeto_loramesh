@@ -1,5 +1,8 @@
 #include "Arduino.h"
 #include "devconfig.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "main.h"
 #include "heltec.h"
 #include "Lora/loramesh.h"
 #include <Wire.h>
@@ -27,7 +30,7 @@ extern char display_line3[];
 #endif
 
 statemac nextstate;
-void displayline(uint8_t line, char *pucMsg, ...);
+
 
 uint32_t previous_FR = 0;
 uint32_t current_FR = 0;
@@ -47,7 +50,6 @@ void initcomm(void){
         nextstate = ST_RXWAIT;
     }
 }
-
 
 void node_init_sync(uint32_t new_FR) {
     current_FR = new_FR;
@@ -88,81 +90,47 @@ void slottimecontrol() {
    }
 }
 
-void sendTask(void* pvParameters) {
+void CommTask(void* pvParameters) {
     uint8_t ret=0;
-    log_i("SendTask iniciada.");
+    TxMessage_t txMsg;
+    RxMessage_t rxMsg;
 
     while (true) {
-        if (send_pct) {
-            //log_i("send devtype=%d slot=%d", loramesh.mydd.devtype, actualslot);
-
-            if (loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                uint16_t lastmyseqnum = loramesh.getLastSeqNum();  
-                if(actualslot == 0){
-                    ret = loramesh.sendBeacon(lastscantime_ms);
-                    if(ret > 0){
-                        //log_i("Tx Beacon seqnum= %d", lastmyseqnum);
-                        #if 0 //DISPLAY_ENABLE  
-                            char display_line[20];
-                            sprintf(display_line,"B = %d", lastmyseqnum+1);
-                            displayline(2,display_line);
-                        #endif                        
+    
+       if (xQueueReceive(txQueue, &txMsg, 10 / portTICK_PERIOD_MS) == pdTRUE) {
+            log_i("sendmsg devtype=%d slot=%d", loramesh.mydd.devtype, actualslot);
+            switch (txMsg.function) {
+                case FCT_BEACON:
+                    log_i("Seq.num: %d",loramesh.mydd.seqnum);
+                    #if DISPLAY_ENABLE
+                        sprintf(display_line3,"Seq. number: %d",loramesh.mydd.seqnum);
+                        Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
+                    #endif
+                    loramesh.sendBeacon(millis());
+                    break;
+                case FCT_READING:
+                    if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
+                        loramesh.sendData(txMsg.dst, loramesh.lastpkt.seqnum);
                     }
-                    else{
-                        log_i("Falha no envio do beacon !");
+                    else{ //end device
+                        loramesh.sendPacketResponse(txMsg.dst, txMsg.size, txMsg.payload);
                     }
-                }
-                else if(actualslot == 2){
-                    //uint8_t* pucaux = (uint8_t*) &lastmyseqnum;
-                    //frame de requisição que o route vai enviar
-                    //{SRC,DST,FCT,Seq numb,START,QTD PARAMETROS,CRC}
-                    //uint8_t frame[] = {1,2,FCT_READING,*(pucaux+1),*(pucaux),1,1,BYTE_CRC};
-                    //uint8_t frameSize = sizeof(frame);
-
-                    ret = loramesh.sendData(2,lastmyseqnum);
-                    if (ret > 0) {
-                      //log_i("Tx Data Req= %d",lastmyseqnum);
-                        #if DISPLAY_ENABLE  
-                            char display_line[20];
-                            sprintf(display_line,"TxD = %d", lastmyseqnum);
-                            displayline(2,display_line);
-                        #endif   
-                    }
-                    else 
-                      log_i("Falha no envio do frame !");
-                }
-            } else {   //ed response
-                uint8_t *msg;
-                uint8_t msg_size;
-                switch(loramesh.lastpkt.fct)
-                {
-                    //case FCT_BEACON:
-                        //loramesh.sendPacketRes(1);
-                        //nextstate = ST_RXWAIT;
-                    //    break;
-                    case FCT_READING:
-                        //response frame
-                        //{SRC,DST,FCT,SEQ NUMBER,SIZE VALUE,VALUE,CRC};
-                        uint8_t sizeValue = sizeof(value);
-                        value = loramesh.lastpkt.seqnum;
-                        vTaskDelay(40 / portTICK_PERIOD_MS); 
-                        if (loramesh.sendPacketResponse(1,sizeValue,value)) {
-                           log_i("Resposta enviada!");
-                            #if DISPLAY_ENABLE
-                                sprintf(display_line3,"TxD = %d", value);
-                                Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
-                            #endif
-                        }
-                        else 
-                           log_e ("Falha no envio da resposta!");
-                        //nextstate = ST_RXWAIT;
-                        break;
-                }
-                
-
+                    break;
+                default:
+                    log_w("Funcao nao suportada: %d", txMsg.function);
             }
         }
-        send_pct = 0;
+
+        if (loramesh.receivePacket()) {
+            rxMsg.src = loramesh.lastpkt.srcaddress;
+            rxMsg.function = loramesh.lastpkt.fct;
+            rxMsg.size = loramesh.lastpkt.packetSize;
+            memcpy(rxMsg.payload, loramesh.lastpkt.rxpacket, rxMsg.size);
+            rxMsg.rssi = loramesh.packetRssi();
+
+            xQueueSend(rxQueue, &rxMsg, 0);
+        }
+
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
