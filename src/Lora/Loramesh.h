@@ -63,11 +63,12 @@ typedef struct  {
 } strDevicedescription;
 
 // Fila para armazenar mensagens recebidas
-typedef struct {
-    uint8_t buffer[BUFFER_SIZE];
-    uint8_t length;
-    uint8_t slot;
-} RxMessage;
+//estrutura não utilizada no código
+// typedef struct {
+//     uint8_t buffer[BUFFER_SIZE];
+//     uint8_t length;
+//     uint8_t slot;
+// } RxMessage;
 
 typedef enum {
    DEV_TYPE_ROUTER=1,
@@ -77,7 +78,7 @@ typedef enum {
 typedef enum {
    FCT_BEACON=1,
    FCT_JOIN,
-   FCT_DATA,
+   FCT_SYNC_SUCESS, // achei um nome mais adequado para um resposta de beacon
    FCT_DESCRIPTION,
    FCT_READING,
    FCT_WRITING
@@ -131,9 +132,11 @@ public:
 
   uint8_t sendPacketReq(uint8_t dst, uint8_t fct, uint8_t start, uint8_t qtdParametros);
   uint8_t sendBeacon(long timestamp);
-  uint8_t sendData(uint8_t dstaddr,uint16_t value);
-  uint8_t sendPacketResponse(uint8_t dst, uint8_t size, uint8_t *buf); //envio de uma resposta de leitura
-  uint8_t sendPacketRes(uint8_t dstaddr); //envio de uma resposta de beacon
+  uint8_t sendBeacontRes(uint8_t dstaddr); //envio de uma resposta de beacon
+  uint8_t sendReadingReq(uint8_t dstaddr,uint8_t start, uint8_t qtdParametros);
+  uint8_t sendReadingRes(uint8_t dst, uint8_t size, uint8_t *buf); //envio de uma resposta de leitura
+  uint8_t sendWrittingReq(uint8_t dst, uint8_t start, uint8_t qtdParametros, uint8_t value); 
+  uint8_t sendWrittingRes(uint8_t dst, uint8_t status);
 
 
   void setDioActionsForReceivePacket(void);
@@ -147,8 +150,8 @@ public:
   uint16_t getseqnum(uint8_t *packet,uint8_t len);
   uint16_t getLastSeqNum(void);
   uint16_t getLastPctSeqNum(void);
-  uint8_t getResponseCode(uint8_t* packet);
-  uint8_t getResponseValue(uint8_t* packet, uint8_t* responseBuffer, uint8_t buffersize);
+  uint8_t getResponseStatus(void);
+  uint32_t getReadingDataAsUint32(void); // obtem o valor de leitura
  
 
   void clearBuffer(uint8_t *buffer, int size);

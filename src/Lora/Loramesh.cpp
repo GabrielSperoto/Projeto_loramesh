@@ -51,7 +51,7 @@ volatile bool operationDone = false;
 #if defined ( WIFI_LoRa_32_V2 )
 strDevicedescription devid[]={
    {0xACFD,DEV_TYPE_ROUTER,1,0},
-   {0xF095,DEV_TYPE_ENDDEV,2,2},
+   {0xF482,DEV_TYPE_ENDDEV,2,2},
    {0xCC7F,DEV_TYPE_ENDDEV,3,3},
    {0X8096,DEV_TYPE_ENDDEV,4,4}
 };
@@ -566,50 +566,115 @@ uint16_t LoRaClass::getLastPctSeqNum(){
     return (lastpkt.seqnum);
 }
 
-uint8_t LoRaClass::getResponseCode(uint8_t* packet){
-  if(lastpkt.packetSize > 5) return packet[5];
+uint8_t LoRaClass::getResponseStatus(){
+  uint8_t* rxPacket = lastpkt.rxpacket;
+  uint8_t size = lastpkt.packetSize;
+  if(size > 5) return rxPacket[5];
   return -1;
 }
 
-uint8_t LoRaClass::getResponseValue(uint8_t* packet, uint8_t* responseBuffer, uint8_t buffersize){
-  if(lastpkt.packetSize > 5 && packet[2] == FCT_READING){
-    uint8_t valueSize = packet[5];
-    if(valueSize <= buffersize){
-      memcpy(responseBuffer,&packet[6],valueSize);
-      return valueSize;
-    }
+uint32_t LoRaClass::getReadingDataAsUint32(){
+  uint8_t* rxPacket = lastpkt.rxpacket;
+  uint8_t size = lastpkt.packetSize;
+  uint32_t value;
+
+  if(size > 5 && rxPacket[2] == FCT_READING){
+    uint8_t valueSize = rxPacket[5];
+    uint8_t* buffer = &rxPacket[6];
+
+    uint8_t* pucaux = (uint8_t*) &value;
+
+    // log_i("buffer size: %2x buffer[6-9]:  %2x %2x %2x %2x",valueSize,buffer[0],buffer[1],buffer[2],buffer[3]);
+
+    pucaux[0] = buffer[3]; // LSB
+    pucaux[1] = buffer[2];
+    pucaux[2] = buffer [1];
+    pucaux[3] = buffer[0]; // MSB
+
+    return value;
   }
 
-  return 0;
-  
-
+  return -1;
 }
 
 
 //estrutura do pacote de requisição [dst,src,seq number, fct, start, qtd parametros, crc]
 //função não utilizad no código por enquanto
-uint8_t LoRaClass::sendPacketReq(uint8_t dst, uint8_t fct, uint8_t start, uint8_t qtdParametros){
+// optou-se por implementar funções mais especializadas em vez de uma função generica
+// uint8_t LoRaClass::sendPacketReq(uint8_t dst, uint8_t fct, uint8_t start, uint8_t qtdParametros){
   
-  uint8_t buf[BUFFER_SIZE];
+//   uint8_t buf[BUFFER_SIZE];
+//   uint8_t pos = 0;
+//   uint8_t *pucaux = (uint8_t *) &mydd.seqnum;
+//   uint8_t ret;
+
+//   buf[pos++] = dst;
+//   buf[pos++] = mydd.devaddr;
+//   buf[pos++] = *(pucaux+1);
+//   buf[pos++] = *(pucaux+0);
+//   buf[pos++] = fct;
+//   buf[pos++] = start;
+//   buf[pos++] = qtdParametros;
+//   buf[pos++] = BYTE_CRC;
+
+//   ret = sendPacket(buf,pos);
+
+//   if (ret) 
+//     return pos;
+//   else
+//     return 0;
+// }
+
+/* Formato de um frame de escrita
+   {Source adress,Destination adress, function code, sequence number, start, qtd. parametros,value,crc}
+*/
+
+uint8_t LoRaClass::sendWrittingReq(uint8_t dst, uint8_t start, uint8_t qtdParametros, uint8_t value){
+  uint8_t buffer[BUFFER_SIZE];
+  uint8_t* pucaux = (uint8_t*) mydd.seqnum;
   uint8_t pos = 0;
-  uint8_t *pucaux = (uint8_t *) &mydd.seqnum;
-  uint8_t ret;
+  
+  //monta o pacote de leitura
+  buffer[pos++] = mydd.devaddr;
+  buffer[pos++] = dst;
+  buffer[pos++] = FCT_WRITING;
+  buffer[pos++] = *(pucaux + 1);
+  buffer[pos++] = *pucaux;
+  buffer[pos++] = start;
+  buffer[pos++] = qtdParametros;
+  buffer[pos++] = value;
+  buffer[pos++] = BYTE_CRC;
 
-  buf[pos++] = dst;
-  buf[pos++] = mydd.devaddr;
-  buf[pos++] = *(pucaux+1);
-  buf[pos++] = *(pucaux+0);
-  buf[pos++] = fct;
-  buf[pos++] = start;
-  buf[pos++] = qtdParametros;
-  buf[pos++] = BYTE_CRC;
+  uint8_t ret = sendPacket(buffer,pos);
 
-  ret = sendPacket(buf,pos);
+  log_i("Reading Request: %2X %2X %2X %2X %2X %2X %2X %2X %2X",buffer[0],buffer[1],buffer[2],buffer[3],buffer[4],buffer[5],buffer[6],buffer[7],buffer[8]);
 
-  if (ret) 
-    return pos;
-  else
-    return 0;
+  if(ret) return pos;
+  else return 0;
+ 
+}
+
+/* Formato de uma resposta de escrita
+  {src,dst,fct,seq number, status,crc}
+*/
+uint8_t LoRaClass::sendWrittingRes(uint8_t dst, uint8_t status){
+  uint8_t buffer[BUFFER_SIZE];
+  uint8_t* pucaux = (uint8_t*) lastpkt.seqnum;
+  uint8_t pos = 0;
+
+  buffer[pos++] = mydd.devaddr;
+  buffer[pos++] = dst;
+  buffer[pos++] = FCT_WRITING;
+  buffer[pos++] = *(pucaux + 1);
+  buffer[pos++] = *pucaux;
+  buffer[pos++] = status;
+  buffer[pos++] = BYTE_CRC;
+
+  log_i("Writting Response: %2X %2X %2X %2X %2X %2X %2X",buffer[0],buffer[1],buffer[2],buffer[3],buffer[4],buffer[5],buffer[6]);
+
+  uint8_t ret = sendPacket(buffer,pos);
+  if(ret) return pos;
+  return 0;
 }
 
 uint8_t LoRaClass::sendBeacon(long timestamp)
@@ -649,12 +714,12 @@ uint8_t LoRaClass::sendBeacon(long timestamp)
 }
 
 
-uint8_t LoRaClass::sendData(uint8_t dstaddr,uint16_t value)
+uint8_t LoRaClass::sendReadingReq(uint8_t dstaddr,uint8_t start, uint8_t qtdParametros)
 {
     uint8_t ret=0;
     uint8_t pos=0;
     uint8_t buf[BUFFER_SIZE];
-    uint8_t *pucaux = (uint8_t *) &value;
+    uint8_t *pucaux = (uint8_t *) &mydd.seqnum;
 
     buf[pos++] =  mydd.devaddr;
     buf[pos++] =  dstaddr;
@@ -681,19 +746,23 @@ uint8_t LoRaClass::sendData(uint8_t dstaddr,uint16_t value)
 
 //função implementada para enviar valores inteiros (2 bytes)
 
-uint8_t LoRaClass::sendPacketResponse(uint8_t dst, uint8_t size, uint8_t *buf){
+uint8_t LoRaClass::sendReadingRes(uint8_t dst, uint8_t size, uint8_t *readingValue){
   uint8_t buffer[BUFFER_SIZE];
-  uint8_t* pucaux = buf;
+  uint8_t* pucaux = (uint8_t*) &lastpkt.seqnum;
   uint8_t aux = 0, i=0;
 
   buffer[aux++] = mydd.devaddr;
   buffer[aux++] = dst;
   buffer[aux++] = FCT_READING;
+  buffer[aux++] = *(pucaux + 1);
+  buffer[aux++] = *pucaux;
+  buffer[aux++] = size;
+
+  pucaux = readingValue;
   
   for (i=0;i<size;i++){
       buffer[aux++] = *(pucaux++);
   }
-  buffer[aux++] = size;
 //  pucaux = (uint8_t*) &value;
 //  buffer[aux++] = *(pucaux+3);
 //  buffer[aux++] = *(pucaux+2);
@@ -711,14 +780,14 @@ uint8_t LoRaClass::sendPacketResponse(uint8_t dst, uint8_t size, uint8_t *buf){
        return 0;
      }
 
-     log_i("Data.RES [%d] = %2x %2x %2x %2x %2x", aux, buffer[0], buffer[1],buffer[2],buffer[3], buffer[4]);
+     log_i("Data.RES [%d] = %2x %2x %2x %2x %2x", aux, buffer[5], buffer[6],buffer[7],buffer[8], buffer[9]);
      return 1;
   }
   else
     return 0;
 }
 
-uint8_t LoRaClass::sendPacketRes(uint8_t dstaddr)
+uint8_t LoRaClass::sendBeacontRes(uint8_t dstaddr)
 {
     uint8_t ret=0;
     uint8_t pos=0;
@@ -727,7 +796,7 @@ uint8_t LoRaClass::sendPacketRes(uint8_t dstaddr)
 
     buf[pos++] =  mydd.devaddr;
     buf[pos++] =  dstaddr;
-    buf[pos++] =  FCT_DATA;
+    buf[pos++] =  FCT_SYNC_SUCESS;
     buf[pos++] =  *(pucaux+1);
     buf[pos++] =  *(pucaux+0);
     buf[pos++] =  BYTE_CRC;

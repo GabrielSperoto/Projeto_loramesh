@@ -16,6 +16,8 @@ extern QueueHandle_t rxQueue;    //Comunicacao responde para App
 typedef struct {
     uint8_t dst;
     uint8_t function;
+    uint8_t start;
+    uint8_t qtdParametros; //start e qtdParametros fazem parte do pacote de requisição 
     uint8_t payload[BUFFER_SIZE];
     uint8_t size;
 } TxMessage_t;

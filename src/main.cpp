@@ -113,7 +113,7 @@ void setup() {
             sprintf(display_line1, "ED = %x", loramesh.mydd.devserialnumber);
             Heltec.DisplayShow1(display_line1);
         }
-        sprintf(display_line2, "ADD =", loramesh.mydd.devaddr);
+        sprintf(display_line2, "ADD = %d", loramesh.mydd.devaddr);
         Heltec.DisplayShow2(display_line2);
     #endif
 

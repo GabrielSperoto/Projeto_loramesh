@@ -110,10 +110,16 @@ void CommTask(void* pvParameters) {
                     break;
                 case FCT_READING:
                     if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                        loramesh.sendData(txMsg.dst, loramesh.lastpkt.seqnum);
+                        if (loramesh.sendReadingReq(txMsg.dst, txMsg.start,txMsg.qtdParametros))
+                            log_i("txMsg.dst: %d txMsg.start: %d txMsg.qtdParametros: %d",txMsg.dst,txMsg.start,txMsg.qtdParametros);
+                        else
+                            log_i("Erro no envio da requisição de leitura");
                     }
                     else{ //end device
-                        loramesh.sendPacketResponse(txMsg.dst, txMsg.size, txMsg.payload);
+                        //payload é um buffer para guardar o valor lido
+                        if(loramesh.sendReadingRes(txMsg.dst, txMsg.size, txMsg.payload))
+                            log_i("txMsg.dst: %d txMsg.size: %d txMsg.payload: %d",txMsg.dst,txMsg.size,txMsg.payload[3]); 
+                        
                     }
                     break;
                 default:
