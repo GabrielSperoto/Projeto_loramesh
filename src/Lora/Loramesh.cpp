@@ -597,33 +597,15 @@ uint32_t LoRaClass::getReadingDataAsUint32(){
   return -1;
 }
 
+uint8_t LoRaClass::getWrittingCode(){
+  uint8_t* rxPacket = lastpkt.rxpacket;
+  uint8_t size = lastpkt.packetSize;
+  if(size > 5 && rxPacket[2] == FCT_WRITING) return rxPacket[6];
+  return -1;
+}
+
 
 //estrutura do pacote de requisição [dst,src,seq number, fct, start, qtd parametros, crc]
-//função não utilizad no código por enquanto
-// optou-se por implementar funções mais especializadas em vez de uma função generica
-// uint8_t LoRaClass::sendPacketReq(uint8_t dst, uint8_t fct, uint8_t start, uint8_t qtdParametros){
-  
-//   uint8_t buf[BUFFER_SIZE];
-//   uint8_t pos = 0;
-//   uint8_t *pucaux = (uint8_t *) &mydd.seqnum;
-//   uint8_t ret;
-
-//   buf[pos++] = dst;
-//   buf[pos++] = mydd.devaddr;
-//   buf[pos++] = *(pucaux+1);
-//   buf[pos++] = *(pucaux+0);
-//   buf[pos++] = fct;
-//   buf[pos++] = start;
-//   buf[pos++] = qtdParametros;
-//   buf[pos++] = BYTE_CRC;
-
-//   ret = sendPacket(buf,pos);
-
-//   if (ret) 
-//     return pos;
-//   else
-//     return 0;
-// }
 
 /* Formato de um frame de escrita
    {Source adress,Destination adress, function code, sequence number, start, qtd. parametros,value,crc}

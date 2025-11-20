@@ -152,6 +152,7 @@ public:
   uint16_t getLastPctSeqNum(void);
   uint8_t getResponseStatus(void);
   uint32_t getReadingDataAsUint32(void); // obtem o valor de leitura
+  uint8_t getWrittingCode(void);
  
 
   void clearBuffer(uint8_t *buffer, int size);

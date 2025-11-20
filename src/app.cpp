@@ -7,6 +7,9 @@
 #include <RadioLib.h>
 #include "esp_log.h"
 
+#define PinPot 37
+#define PinLed 36
+
 extern statemac nextstate;
 extern LoRaClass loramesh;
 extern volatile bool messageReceived;
@@ -20,9 +23,12 @@ void slottimecontrol(void);
 void node_init_sync(uint32_t new_FR);
 void displayline(uint8_t line, char *pucMsg, ...);
 
-#define PinPot 37
-uint16_t valorPot = 0;
-float TensaoDeSaida = 0;
+extern float TensaoDeSaida;
+extern uint16_t valorPot;
+
+extern char display_line1[20];
+extern char display_line2[20];
+extern char display_line3[20];
 
 bool ledtoogle = 0;
 
@@ -86,14 +92,20 @@ void applicationTask(void* pvParameters) {
                                 break;
                             }
                             case FCT_WRITING: {
-                                //mensagem de escrita
-                                break;
+                                // uint8_t writtingCode = loramesh.getResponseStatus();
+                                // if (writtingCode == 1){
+                                //     log_i("Escrita realizada com sucesso no no %d",rxMsg.src);
+                                // }
+                                // else{
+                                //     log_i("Falha na escrita no no %d",rxMsg.src);
+                                // }
+                                // break;
                             }
                             case FCT_READING: {
-                                // log_i("Requisição de leitura recebida!");
-                                uint32_t value = loramesh.getReadingDataAsUint32();
+                                // a divisao por 100 é para converter o valor inteiro de volta para float
+                                float value = loramesh.getReadingDataAsUint32()/100.0;
                                 if(value > 0){
-                                    log_i("Valor lido: %d",value);
+                                    log_i("Valor lido: %.2f",value);
                                 }
                                 break;
                             }
@@ -126,6 +138,15 @@ void applicationTask(void* pvParameters) {
                             }
                             case FCT_WRITING:{
                                 //mensagem de escrita
+                                if (loramesh.getWrittingCode() == 1){
+                                    log_i("Led Aceso!");
+                                    digitalWrite(PinLed, HIGH);
+                                }
+                                else{
+                                    log_i("Led apagado!");
+                                    digitalWrite(PinLed, LOW);
+
+                                }
                                 break;
                             }
                             case FCT_READING:{
@@ -160,22 +181,40 @@ void applicationTask(void* pvParameters) {
                     txmsg.dst = 2;
                     txmsg.function = FCT_READING;
                     txmsg.size = 0;
+                    txmsg.value = 0;
                     txmsg.start = 1;
                     txmsg.qtdParametros = 1;
                     xQueueSend(txQueue, &txmsg, 0);                    
                 }
                 else{ //end device
-                    uint32_t value=120;
-                    uint8_t *pucaux = (uint8_t *) &value;
-                    txmsg.dst = 1;
-                    txmsg.function = FCT_READING;
-                    txmsg.size = sizeof(value);
-                    txmsg.payload[0] = *(pucaux+3);
-                    txmsg.payload[1] = *(pucaux+2);
-                    txmsg.payload[2] = *(pucaux + 1);
-                    txmsg.payload[3] = *pucaux;
-                    xQueueSend(txQueue, &txmsg, 0);
 
+                    //resposta de leitura do ED
+                    if(rxMsg.function == FCT_READING){
+                        // o valor é multiplicado por 100 para enviar como inteiro
+                        uint32_t value= TensaoDeSaida*100;
+                        uint8_t *pucaux = (uint8_t *) &value;
+                        // log_i("Value: %d",value);
+                        txmsg.dst = 1;
+                        txmsg.function = FCT_READING;
+                        txmsg.size = sizeof(value);
+                        txmsg.value = 0;
+                        txmsg.payload[0] = *(pucaux+3);
+                        txmsg.payload[1] = *(pucaux+2);
+                        txmsg.payload[2] = *(pucaux + 1);
+                        txmsg.payload[3] = *pucaux;
+                        xQueueSend(txQueue, &txmsg, 0);
+
+                }   else {
+                    //reposta de escrita do ED
+                    txmsg.dst = 1;
+                    txmsg.function = FCT_WRITING;
+                    txmsg.size = 0;
+                    txmsg.start = 0;
+                    txmsg.qtdParametros = 0;
+                    txmsg.value = 1; //código de sucesso
+                    
+                    xQueueSend(txQueue, &txmsg, 0);
+                }
                 }
                 send_pct = 1;
                 nextstate = ST_STARTRX;
@@ -212,20 +251,6 @@ void applicationTask(void* pvParameters) {
     }
 }
 
-void LerPotenciometro(void* pvParameters) {
-    log_i("LerPotenciometroTask iniciada.");
-    // NOTA: Esta tarefa agora serve apenas para log local no ED.
-    // O valor lido aqui não é mais enviado pela rede.
-    for (;;) {
-        uint16_t leitura_completa = analogRead(PinPot);
-        valorPot = leitura_completa;
-        TensaoDeSaida = (((float)valorPot / 4095.0) * 3.3);
-        
-        log_d("ValorPot (0-4095) = %d | Tensao de Saida = %.2fV", valorPot, TensaoDeSaida);
-        
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-    }
-}
 
 void ledblink(uint8_t ledpin) {
     digitalWrite(ledpin, HIGH);

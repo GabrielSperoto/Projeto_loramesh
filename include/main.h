@@ -20,6 +20,7 @@ typedef struct {
     uint8_t qtdParametros; //start e qtdParametros fazem parte do pacote de requisição 
     uint8_t payload[BUFFER_SIZE];
     uint8_t size;
+    uint8_t value; //valor usado na escrita
 } TxMessage_t;
 
 typedef struct {

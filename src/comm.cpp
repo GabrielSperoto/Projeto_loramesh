@@ -119,7 +119,20 @@ void CommTask(void* pvParameters) {
                         //payload é um buffer para guardar o valor lido
                         if(loramesh.sendReadingRes(txMsg.dst, txMsg.size, txMsg.payload))
                             log_i("txMsg.dst: %d txMsg.size: %d txMsg.payload: %d",txMsg.dst,txMsg.size,txMsg.payload[3]); 
-                        
+                    }
+                case FCT_WRITING:
+                    if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
+                        if (loramesh.sendWrittingReq(txMsg.dst, txMsg.start,txMsg.qtdParametros,txMsg.value))
+                            log_i("txMsg.dst: %d txMsg.start: %d txMsg.qtdParametros: %d txMsg.value: %d",txMsg.dst,txMsg.start,txMsg.qtdParametros,txMsg.value);
+                        else
+                            log_i("Erro no envio da requisição de escrita");
+                    } 
+                    
+                    else{ //end device
+                        if (loramesh.sendWrittingRes(txMsg.dst, 1)) //envia código de status 1 (sucesso)
+                            log_i("txMsg.dst: %d",txMsg.dst); 
+                        else
+                            log_i("Erro no envio da resposta de escrita");
                     }
                     break;
                 default:

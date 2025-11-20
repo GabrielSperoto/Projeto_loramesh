@@ -29,6 +29,10 @@ char display_line2[20];
 char display_line3[20];
 #endif
 
+#define PinPot 37
+uint16_t valorPot = 0;
+float TensaoDeSaida = 0;
+
 QueueHandle_t txQueue;    //App transmite para comunicacao
 QueueHandle_t rxQueue;    //Comunicacao responde para App
 
@@ -51,6 +55,26 @@ void displayline(uint8_t line, char *pucMsg, ...) {
         
     }   
     #endif
+}
+
+void LerPotenciometro(void* pvParameters) {
+    log_i("LerPotenciometroTask iniciada.");
+    // NOTA: Esta tarefa agora serve apenas para log local no ED.
+    // O valor lido aqui não é mais enviado pela rede.
+    for (;;) {
+        uint16_t leitura_completa = analogRead(PinPot);
+        valorPot = leitura_completa;
+        TensaoDeSaida = (((float)valorPot / 4095.0) * 3.3);
+        
+        log_d("ValorPot (0-4095) = %d | Tensao de Saida = %.2fV", valorPot, TensaoDeSaida);
+
+        #if DISPLAY_ENABLE
+        sprintf(display_line3, "Pot: %d  %.2fV", valorPot, TensaoDeSaida);
+        Heltec.DisplayShowAll(display_line1, display_line2, display_line3);
+        #endif
+        
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
 }
 
 void setindpolls() {
@@ -125,9 +149,9 @@ void setup() {
     xTaskCreatePinnedToCore(CommTask, "CommTask", 3072, NULL, 3, &Send_TaskHandle, 1);
     xTaskCreatePinnedToCore(watchdogTask, "WatchdogTask", 2048, NULL, 1, &Watchdog_TaskHandle, 1);
     
-    // if (loramesh.mydd.devtype == DEV_TYPE_ENDDEV) {
-    //     xTaskCreatePinnedToCore(LerPotenciometro, "LerPotenciometroTask", 2048, NULL, 1, &LerPotenciometro_TaskHandle, 1);
-    // }
+    if (loramesh.mydd.devtype == DEV_TYPE_ENDDEV) {
+        xTaskCreatePinnedToCore(LerPotenciometro, "LerPotenciometroTask", 2048, NULL, 1, &LerPotenciometro_TaskHandle, 1);
+    }
     Serial.println("--- Criacao de tarefas finalizada ---\n");
 }
 
