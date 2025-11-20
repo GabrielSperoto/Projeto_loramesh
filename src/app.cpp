@@ -8,7 +8,7 @@
 #include "esp_log.h"
 
 #define PinPot 37
-#define PinLed 36
+#define PinLed 25
 
 extern statemac nextstate;
 extern LoRaClass loramesh;
@@ -92,14 +92,14 @@ void applicationTask(void* pvParameters) {
                                 break;
                             }
                             case FCT_WRITING: {
-                                // uint8_t writtingCode = loramesh.getResponseStatus();
-                                // if (writtingCode == 1){
-                                //     log_i("Escrita realizada com sucesso no no %d",rxMsg.src);
-                                // }
-                                // else{
-                                //     log_i("Falha na escrita no no %d",rxMsg.src);
-                                // }
-                                // break;
+                                uint8_t writtingCode = loramesh.getResponseStatus();
+                                if (writtingCode == 1){
+                                    log_i("Escrita realizada com sucesso no no %d",rxMsg.src);
+                                }
+                                else{
+                                    log_i("Falha na escrita no no %d",rxMsg.src);
+                                }
+                                break;
                             }
                             case FCT_READING: {
                                 // a divisao por 100 é para converter o valor inteiro de volta para float
@@ -147,6 +147,7 @@ void applicationTask(void* pvParameters) {
                                     digitalWrite(PinLed, LOW);
 
                                 }
+                                nextstate = ST_TXDATA;
                                 break;
                             }
                             case FCT_READING:{
@@ -179,9 +180,9 @@ void applicationTask(void* pvParameters) {
                 //achq que aqui eu deveria montar o frame especifico e colocar na fila...
                 if (loramesh.mydd.devtype == DEV_TYPE_ROUTER){
                     txmsg.dst = 2;
-                    txmsg.function = FCT_READING;
+                    txmsg.function = FCT_WRITING;
                     txmsg.size = 0;
-                    txmsg.value = 0;
+                    txmsg.value = 1;
                     txmsg.start = 1;
                     txmsg.qtdParametros = 1;
                     xQueueSend(txQueue, &txmsg, 0);                    
@@ -205,15 +206,15 @@ void applicationTask(void* pvParameters) {
                         xQueueSend(txQueue, &txmsg, 0);
 
                 }   else {
-                    //reposta de escrita do ED
-                    txmsg.dst = 1;
-                    txmsg.function = FCT_WRITING;
-                    txmsg.size = 0;
-                    txmsg.start = 0;
-                    txmsg.qtdParametros = 0;
-                    txmsg.value = 1; //código de sucesso
-                    
-                    xQueueSend(txQueue, &txmsg, 0);
+                        //reposta de escrita do ED
+                        txmsg.dst = 1;
+                        txmsg.function = FCT_WRITING;
+                        txmsg.size = 0;
+                        txmsg.start = 0;
+                        txmsg.qtdParametros = 0;
+                        txmsg.value = 1; //código de sucesso
+                        
+                        xQueueSend(txQueue, &txmsg, 0);
                 }
                 }
                 send_pct = 1;

@@ -612,8 +612,9 @@ uint8_t LoRaClass::getWrittingCode(){
 */
 
 uint8_t LoRaClass::sendWrittingReq(uint8_t dst, uint8_t start, uint8_t qtdParametros, uint8_t value){
+
   uint8_t buffer[BUFFER_SIZE];
-  uint8_t* pucaux = (uint8_t*) mydd.seqnum;
+  uint8_t* pucaux = (uint8_t*) &mydd.seqnum;
   uint8_t pos = 0;
   
   //monta o pacote de leitura
@@ -629,7 +630,7 @@ uint8_t LoRaClass::sendWrittingReq(uint8_t dst, uint8_t start, uint8_t qtdParame
 
   uint8_t ret = sendPacket(buffer,pos);
 
-  log_i("Reading Request: %2X %2X %2X %2X %2X %2X %2X %2X %2X",buffer[0],buffer[1],buffer[2],buffer[3],buffer[4],buffer[5],buffer[6],buffer[7],buffer[8]);
+  // // log_i("Reading Request: %2X %2X %2X %2X %2X %2X %2X %2X %2X",buffer[0],buffer[1],buffer[2],buffer[3],buffer[4],buffer[5],buffer[6],buffer[7],buffer[8]);
 
   if(ret) return pos;
   else return 0;
@@ -641,7 +642,7 @@ uint8_t LoRaClass::sendWrittingReq(uint8_t dst, uint8_t start, uint8_t qtdParame
 */
 uint8_t LoRaClass::sendWrittingRes(uint8_t dst, uint8_t status){
   uint8_t buffer[BUFFER_SIZE];
-  uint8_t* pucaux = (uint8_t*) lastpkt.seqnum;
+  uint8_t* pucaux = (uint8_t*) &lastpkt.seqnum;
   uint8_t pos = 0;
 
   buffer[pos++] = mydd.devaddr;

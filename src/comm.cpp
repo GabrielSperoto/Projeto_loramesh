@@ -120,6 +120,7 @@ void CommTask(void* pvParameters) {
                         if(loramesh.sendReadingRes(txMsg.dst, txMsg.size, txMsg.payload))
                             log_i("txMsg.dst: %d txMsg.size: %d txMsg.payload: %d",txMsg.dst,txMsg.size,txMsg.payload[3]); 
                     }
+                    break;
                 case FCT_WRITING:
                     if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
                         if (loramesh.sendWrittingReq(txMsg.dst, txMsg.start,txMsg.qtdParametros,txMsg.value))
