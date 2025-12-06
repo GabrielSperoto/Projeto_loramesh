@@ -1,8 +1,13 @@
 #ifndef _MAIN_H
 #define _MAIN_H
 
+#include "devconfig.h"
+
+
 void applicationTask(void* pvParameters);
 void CommTask(void* pvParameters);
+void TCP_communicationTask(void* pvParameters);
+void init_TCP_comm();
 void initcomm(void);
 void displayline(uint8_t line, char *pucMsg, ...);
 int send_beacon(void);

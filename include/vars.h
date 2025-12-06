@@ -5,8 +5,8 @@
 //const char* ssid = "Daniela";
 //const char* password = "13211321";
 
-const char* ssid = "InovaIndustria";
-const char* password = "industria50";
+const char* ssid = "Speroto";
+const char* password = "senha123";
 
 //Parâmetros do servidor
 const char* server_ip = "10.0.67.214";        // IP do servidor

@@ -18,6 +18,7 @@ TaskHandle_t App_TaskHandle = nullptr;
 TaskHandle_t Send_TaskHandle = nullptr;
 TaskHandle_t Watchdog_TaskHandle = nullptr;
 TaskHandle_t LerPotenciometro_TaskHandle = nullptr;
+TaskHandle_t TCP_Communication_TaskHandle = nullptr;
 
 // Variáveis globais de estado
 extern LoRaClass loramesh;
@@ -132,6 +133,7 @@ void setup() {
             //sprintf(display_line1, "RT=%x ", loramesh.mydd.devserialnumber);
             sprintf(display_line1, "RT = %x", loramesh.mydd.devserialnumber);
             Heltec.DisplayShow1(display_line1);
+
         } else {
             //sprintf(display_line1, "ED=%x ", loramesh.mydd.devserialnumber);
             sprintf(display_line1, "ED = %x", loramesh.mydd.devserialnumber);
@@ -148,9 +150,15 @@ void setup() {
     xTaskCreatePinnedToCore(applicationTask, "ApplicationTask", 4096, NULL, 3, &App_TaskHandle, 1);
     xTaskCreatePinnedToCore(CommTask, "CommTask", 3072, NULL, 3, &Send_TaskHandle, 1);
     xTaskCreatePinnedToCore(watchdogTask, "WatchdogTask", 2048, NULL, 1, &Watchdog_TaskHandle, 1);
-    
+
+
+    //endev
     if (loramesh.mydd.devtype == DEV_TYPE_ENDDEV) {
         xTaskCreatePinnedToCore(LerPotenciometro, "LerPotenciometroTask", 2048, NULL, 1, &LerPotenciometro_TaskHandle, 1);
+    } 
+    else{ // router
+        xTaskCreatePinnedToCore(TCP_communicationTask, "TCP_CommunicationTask", 4096, NULL, 2, &TCP_Communication_TaskHandle, 1);
+        init_TCP_comm();
     }
     Serial.println("--- Criacao de tarefas finalizada ---\n");
 }
