@@ -87,12 +87,9 @@ typedef enum {
 typedef enum  {
     ST_TXBEACON,
     ST_RXWAIT,
-    ST_RXDONE,
     ST_TXDATA,
     ST_STANDBY,
-    ST_TXREQUEST,
     ST_STARTRX,
-    ST_RXRESPONSE
 }statemac;
 
 #if defined (__STM32F1__)
