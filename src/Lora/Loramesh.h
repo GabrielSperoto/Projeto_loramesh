@@ -80,11 +80,15 @@ typedef enum {
    FCT_JOIN,
    FCT_SYNC_SUCESS, // achei um nome mais adequado para um resposta de beacon
    FCT_DESCRIPTION,
-   FCT_READING,
-   FCT_WRITING
+   FCT_READINGREQ,
+    FCT_READINGRES,
+   FCT_WRITINGREQ,
+   FCT_WRITINGRES
 } functioncode;
 
 typedef enum  {
+    ST_BEACONREQUEST=0,
+    ST_BEACONRESPONSE,
     ST_TXBEACON,
     ST_RXWAIT,
     ST_TXDATA,

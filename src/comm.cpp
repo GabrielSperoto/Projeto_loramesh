@@ -11,6 +11,7 @@
 
 uint8_t send_pct = 0;
 extern LoRaClass loramesh;
+extern void SendMessage(String src, String dst, String fct, String param, String val);
 long lastabstime = 0;
 long lastscantime_ms = 0;
 uint8_t actualslot = 0;
@@ -108,27 +109,53 @@ void CommTask(void* pvParameters) {
                     #endif
                     loramesh.sendBeacon(millis());
                     break;
-                case FCT_READING:
+                case FCT_READINGREQ:
                     if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
                         if (loramesh.sendReadingReq(txMsg.dst, txMsg.start,txMsg.qtdParametros))
                             log_i("txMsg.dst: %d txMsg.start: %d txMsg.qtdParametros: %d",txMsg.dst,txMsg.start,txMsg.qtdParametros);
                         else
                             log_i("Erro no envio da requisição de leitura");
                     }
+                    break;
+
+                case FCT_READINGRES:
+                    if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
+                        //aqui o router envia a resposta de leitura para a app
+                        String src = String(txMsg.src);
+                        String dst = String(loramesh.mydd.devaddr);
+                        String fct = String(txMsg.function);
+                        String param = String(txMsg.start); // exemplo de leitura do primeiro byte do payload
+                        String val = String(txMsg.value); // exemplo de leitura do segundo byte do payload
+                        SendMessage(src,dst,fct,param,val);
+                    }
+
                     else{ //end device
+                        //ed envia a resposta para o router
                         //payload é um buffer para guardar o valor lido
                         if(loramesh.sendReadingRes(txMsg.dst, txMsg.size, txMsg.payload))
                             log_i("txMsg.dst: %d txMsg.size: %d txMsg.payload: %d",txMsg.dst,txMsg.size,txMsg.payload[3]); 
                     }
                     break;
-                case FCT_WRITING:
+
+                case FCT_WRITINGREQ:
                     if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
                         if (loramesh.sendWrittingReq(txMsg.dst, txMsg.start,txMsg.qtdParametros,txMsg.value))
                             log_i("txMsg.dst: %d txMsg.start: %d txMsg.qtdParametros: %d txMsg.value: %d",txMsg.dst,txMsg.start,txMsg.qtdParametros,txMsg.value);
                         else
                             log_i("Erro no envio da requisição de escrita");
                     } 
-                    
+                    break;
+                case FCT_WRITINGRES:
+                    if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
+                        //aqui o router envia a resposta de escrita para a app
+                        String src = String(rxMsg.src);
+                        String dst = String(loramesh.mydd.devaddr);
+                        String fct = String(rxMsg.function);
+                        String param = ""; // exemplo de leitura do primeiro byte do payload
+                        String val = (loramesh.getWrittingCode() == 1) ? "Success" : "Failure"; // exemplo de leitura do segundo byte do payload
+                        SendMessage(src,dst,fct,param,val);
+                    }
+
                     else{ //end device
                         if (loramesh.sendWrittingRes(txMsg.dst, 1)) //envia código de status 1 (sucesso)
                             log_i("txMsg.dst: %d",txMsg.dst); 

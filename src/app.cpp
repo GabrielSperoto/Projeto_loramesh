@@ -91,22 +91,26 @@ void applicationTask(void* pvParameters) {
                                 // log_i("Rx.seqnumb: %d",loramesh.lastpkt.seqnum);
                                 break;
                             }
-                            case FCT_WRITING: {
+                            case FCT_WRITINGRES: {
                                 uint8_t writtingCode = loramesh.getResponseStatus();
+                                txmsg.value = writtingCode;
                                 if (writtingCode == 1){
                                     log_i("Escrita realizada com sucesso no no %d",rxMsg.src);
                                 }
                                 else{
                                     log_i("Falha na escrita no no %d",rxMsg.src);
                                 }
+                                nextstate = ST_TXDATA;
                                 break;
                             }
-                            case FCT_READING: {
+                            case FCT_READINGRES: {
                                 // a divisao por 100 é para converter o valor inteiro de volta para float
-                                float value = loramesh.getReadingDataAsUint32()/100.0;
+                                float value = loramesh.getReadingDataAsUint32();
+                                txmsg.value = value;
                                 if(value > 0){
                                     log_i("Valor lido: %.2f",value);
                                 }
+                                nextstate = ST_TXDATA;
                                 break;
                             }
                             case FCT_DESCRIPTION: {
@@ -136,7 +140,7 @@ void applicationTask(void* pvParameters) {
     
                                 break;
                             }
-                            case FCT_WRITING:{
+                            case FCT_WRITINGREQ:{
                                 //mensagem de escrita
                                 if (loramesh.getWrittingCode() == 1){
                                     log_i("Led Aceso!");
@@ -150,7 +154,7 @@ void applicationTask(void* pvParameters) {
                                 nextstate = ST_TXDATA;
                                 break;
                             }
-                            case FCT_READING:{
+                            case FCT_READINGREQ:{
                                 // log_i("Pacote de leitura recebido! ");
                                 uint16_t seqnumber = loramesh.lastpkt.seqnum;
                                 log_i("Rx.seqnumber: %d",seqnumber);
@@ -179,10 +183,9 @@ void applicationTask(void* pvParameters) {
                 lastActivityMillis = millis();
                 //achq que aqui eu deveria montar o frame especifico e colocar na fila...
                 if (loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                    txmsg.dst = 2;
-                    txmsg.function = FCT_WRITING;
-                    txmsg.size = 0;
-                    txmsg.value = 1;
+                    txmsg.src = loramesh.mydd.devaddr;
+                    txmsg.dst = BROADCAST_ADDR; //DST seria o enderco do ed que enviou a resposta ?
+                    txmsg.function = rxMsg.function;
                     txmsg.start = 1;
                     txmsg.qtdParametros = 1;
                     xQueueSend(txQueue, &txmsg, 0);                    
@@ -190,13 +193,13 @@ void applicationTask(void* pvParameters) {
                 else{ //end device
 
                     //resposta de leitura do ED
-                    if(rxMsg.function == FCT_READING){
+                    if(rxMsg.function == FCT_READINGREQ){
                         // o valor é multiplicado por 100 para enviar como inteiro
                         uint32_t value= TensaoDeSaida*100;
                         uint8_t *pucaux = (uint8_t *) &value;
                         // log_i("Value: %d",value);
                         txmsg.dst = 1;
-                        txmsg.function = FCT_READING;
+                        txmsg.function = FCT_READINGRES;
                         txmsg.size = sizeof(value);
                         txmsg.value = 0;
                         txmsg.payload[0] = *(pucaux+3);
@@ -208,7 +211,7 @@ void applicationTask(void* pvParameters) {
                 }   else {
                         //reposta de escrita do ED
                         txmsg.dst = 1;
-                        txmsg.function = FCT_WRITING;
+                        txmsg.function = FCT_WRITINGRES;
                         txmsg.size = 0;
                         txmsg.start = 0;
                         txmsg.qtdParametros = 0;

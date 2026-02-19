@@ -578,7 +578,7 @@ uint32_t LoRaClass::getReadingDataAsUint32(){
   uint8_t size = lastpkt.packetSize;
   uint32_t value;
 
-  if(size > 5 && rxPacket[2] == FCT_READING){
+  if(size > 5 && rxPacket[2] == FCT_READINGREQ){
     uint8_t valueSize = rxPacket[5];
     uint8_t* buffer = &rxPacket[6];
 
@@ -600,7 +600,7 @@ uint32_t LoRaClass::getReadingDataAsUint32(){
 uint8_t LoRaClass::getWrittingCode(){
   uint8_t* rxPacket = lastpkt.rxpacket;
   uint8_t size = lastpkt.packetSize;
-  if(size > 5 && rxPacket[2] == FCT_WRITING) return rxPacket[6];
+  if(size > 5 && rxPacket[2] == FCT_WRITINGREQ) return rxPacket[6];
   return -1;
 }
 
@@ -620,7 +620,7 @@ uint8_t LoRaClass::sendWrittingReq(uint8_t dst, uint8_t start, uint8_t qtdParame
   //monta o pacote de leitura
   buffer[pos++] = mydd.devaddr;
   buffer[pos++] = dst;
-  buffer[pos++] = FCT_WRITING;
+  buffer[pos++] = FCT_WRITINGREQ;
   buffer[pos++] = *(pucaux + 1);
   buffer[pos++] = *pucaux;
   buffer[pos++] = start;
@@ -647,7 +647,7 @@ uint8_t LoRaClass::sendWrittingRes(uint8_t dst, uint8_t status){
 
   buffer[pos++] = mydd.devaddr;
   buffer[pos++] = dst;
-  buffer[pos++] = FCT_WRITING;
+  buffer[pos++] = FCT_WRITINGRES;
   buffer[pos++] = *(pucaux + 1);
   buffer[pos++] = *pucaux;
   buffer[pos++] = status;
@@ -706,7 +706,7 @@ uint8_t LoRaClass::sendReadingReq(uint8_t dstaddr,uint8_t start, uint8_t qtdPara
 
     buf[pos++] =  mydd.devaddr;
     buf[pos++] =  dstaddr;
-    buf[pos++] =  FCT_READING;
+    buf[pos++] =  FCT_READINGREQ;
     buf[pos++] =  *(pucaux+1);
     buf[pos++] =  *(pucaux+0);
     buf[pos++] =  BYTE_CRC;
@@ -736,7 +736,7 @@ uint8_t LoRaClass::sendReadingRes(uint8_t dst, uint8_t size, uint8_t *readingVal
 
   buffer[aux++] = mydd.devaddr;
   buffer[aux++] = dst;
-  buffer[aux++] = FCT_READING;
+  buffer[aux++] = FCT_READINGRES;
   buffer[aux++] = *(pucaux + 1);
   buffer[aux++] = *pucaux;
   buffer[aux++] = size;

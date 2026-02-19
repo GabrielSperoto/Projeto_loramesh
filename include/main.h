@@ -19,6 +19,7 @@ extern QueueHandle_t txQueue;    //App transmite para comunicacao
 extern QueueHandle_t rxQueue;    //Comunicacao responde para App
 
 typedef struct {
+    uint8_t src;
     uint8_t dst;
     uint8_t function;
     uint8_t start;
