@@ -39,4 +39,4 @@ O protocolo utiliza um cabeçalho customizado para gerenciar o roteamento:
 
 2. **Instalação:**
    ```bash
-   git clone [https://github.com/seu-usuario/loramesh-protocol.git](https://github.com/seu-usuario/loramesh-protocol.git)
+   [git clone [https://github.com/seu-usuario/loramesh-protocol.git](https://github.com/seu-usuario/loramesh-protocol.git)](https://github.com/GabrielSperoto/Projeto_loramesh.git)
