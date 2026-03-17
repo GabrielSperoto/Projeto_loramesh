@@ -40,14 +40,6 @@ volatile bool operationDone = false;
 
 //table of node devices...
 //{DeviceID, DEV_TYPE, DeviceAddress, dataslot}
-// V2
-// F095
-// 0x907F
-// 0x5006
-// V3
-// 0x707D
-// 0xDC78
-// 0x1C65
 #if defined ( WIFI_LoRa_32_V2 )
 strDevicedescription devid[]={
    {0xACFD,DEV_TYPE_ROUTER,1,0},
@@ -603,6 +595,28 @@ uint8_t LoRaClass::getWrittingCode(){
   if(size > 5 && rxPacket[2] == FCT_WRITINGREQ) return rxPacket[6];
   return -1;
 }
+
+uint8_t LoRaClass::getSrcAdress(){
+  return lastpkt.srcaddress;
+}
+
+uint8_t LoRaClass::getFunctionCode(){
+  return 0;
+}
+
+uint8_t LoRaClass::getStart(){
+  return 0;
+}
+
+uint8_t LoRaClass::getQtdParametros(){
+  return 0;
+}
+
+uint8_t LoRaClass::getSizeMsg(){
+  return lastpkt.packetSize;
+}
+
+
 
 
 //estrutura do pacote de requisição [dst,src,seq number, fct, start, qtd parametros, crc]

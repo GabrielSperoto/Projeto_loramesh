@@ -17,6 +17,33 @@ int send_data_response(void);
 
 extern QueueHandle_t txQueue;    //App transmite para comunicacao
 extern QueueHandle_t rxQueue;    //Comunicacao responde para App
+extern QueueHandle_t q_tcp2app;   //tcp tranmite para app
+extern QueueHandle_t q_app2tcp;   //app transmite para tcp
+extern QueueHandle_t q_app2comm;  //app trasmite para comm
+extern QueueHandle_t q_comm2app;  //comm transmite para app
+
+typedef enum {
+    TCP,
+    APP,
+    LORA
+} origem_t;
+
+typedef union {
+    uint8_t bytes[4];
+    uint32_t value;
+} data_t;
+
+typedef struct{
+    origem_t origem; //indica a origem da mensagem (TCP, APP ou LORA)
+    uint8_t src;
+    uint8_t dst;
+    uint8_t function;
+    uint8_t start;
+    uint8_t qtdParametros; //start e qtdParametros fazem parte do pacote de requisição 
+    data_t data; //valor usado na escrita ou leitura
+    uint8_t size;
+    bool ocupado; //indica se o slot está ocupado ou não
+} msg_t;
 
 typedef struct {
     uint8_t src;
@@ -31,10 +58,29 @@ typedef struct {
 
 typedef struct {
     uint8_t src;
+    uint8_t dst;
     uint8_t function;
+    uint8_t start;
+    uint8_t qtdParametros;
+    uint8_t value; //valor usado na escrita
     uint8_t payload[BUFFER_SIZE];
     uint8_t size;
     int16_t rssi;
 } RxMessage_t;
+
+//buffer para armazenar as mensagens da rxMSg
+
+typedef struct {
+    uint8_t src;
+    uint8_t dst;
+    uint8_t function;
+    uint8_t start;
+    uint8_t qtdParametros;
+    uint8_t value;
+    uint8_t payload[BUFFER_SIZE];
+    uint8_t size;
+    int16_t rssi;
+    bool ocupado;
+} SlotBuffer;
 
 #endif

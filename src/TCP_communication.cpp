@@ -9,14 +9,15 @@
 
 
 
-#define PinLED 25
-#define PinPOT 2
+// #define PinLED 25
+// #define PinPOT 2
 
 int count = 0;
 
 WebSocketsClient webSocket;
-TxMessage_t txMsg;
-RxMessage_t rxMsg;
+// TxMessage_t txMsg;
+// RxMessage_t rxMsg;
+msg_t msg;
 
 extern class LoRaClass loramesh;
 
@@ -109,18 +110,37 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     const char* val = doc["val"];
     const char* param = doc["param"];
 
+    //converte para byte
     uint8_t src_addr = strtol(src, nullptr, 10);
     uint8_t dst_addr = strtol(dst, nullptr, 10);
     uint8_t function_num = strtol(fct, nullptr, 10);
     uint8_t val_num = strtol(val, nullptr, 10);
     uint8_t param_num = strtol(param, nullptr, 10);
 
-    txMsg.dst = dst_addr;
-    txMsg.function = function_num;
-    txMsg.value = val_num;
-    txMsg.start = param_num;
+    //guarda a mensagem no payload de rxMsg
 
-    xQueueSend(txQueue, &txMsg, 0);
+    //todo processo é feito usando a esturua msg
+    // rxMsg.src = src_addr;
+    // rxMsg.dst = dst_addr;
+    // rxMsg.function = function_num;
+    // rxMsg.value = val_num;
+    // rxMsg.start = param_num;
+    // rxMsg.dst = dst_addr;
+
+    msg.origem = TCP;
+    msg.src = src_addr;
+    msg.dst = dst_addr;
+    msg.function = function_num;
+    msg.start = param_num;
+    msg.qtdParametros = 1;
+    msg.data.value = val_num;
+    msg.size = sizeof(val_num);
+    msg.ocupado = true;
+
+    // xQueueSend(rxQueue, &rxMsg, 0); a mensagem é enviada pela fila q_tcp_tx
+    xQueueSend(q_tcp2app,&msg,0);
+  
+    log_i("Queue enviada. Src: %d, Dst: %d, Fct: %d, Param: %d, Val: %d", src_addr, dst_addr, function_num, param_num, msg.data.value);
 
     //a mensagem é agora enviada pela rede
 

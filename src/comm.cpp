@@ -95,12 +95,13 @@ void CommTask(void* pvParameters) {
     uint8_t ret=0;
     TxMessage_t txMsg;
     RxMessage_t rxMsg;
+    msg_t msg;
 
     while (true) {
     
-       if (xQueueReceive(txQueue, &txMsg, 10 / portTICK_PERIOD_MS) == pdTRUE) {
+       if (xQueueReceive(q_app2comm, &msg, 10 / portTICK_PERIOD_MS) == pdTRUE) {
             log_i("sendmsg devtype=%d slot=%d", loramesh.mydd.devtype, actualslot);
-            switch (txMsg.function) {
+            switch (msg.function) {
                 case FCT_BEACON:
                     log_i("Seq.num: %d",loramesh.mydd.seqnum);
                     #if DISPLAY_ENABLE
@@ -109,56 +110,39 @@ void CommTask(void* pvParameters) {
                     #endif
                     loramesh.sendBeacon(millis());
                     break;
+
                 case FCT_READINGREQ:
                     if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                        if (loramesh.sendReadingReq(txMsg.dst, txMsg.start,txMsg.qtdParametros))
-                            log_i("txMsg.dst: %d txMsg.start: %d txMsg.qtdParametros: %d",txMsg.dst,txMsg.start,txMsg.qtdParametros);
+                        if (loramesh.sendReadingReq(msg.dst, msg.start,msg.qtdParametros))
+                            log_i("msg.dst: %d msg.start: %d msg.qtdParametros: %d",msg.dst,msg.start,msg.qtdParametros);
                         else
                             log_i("Erro no envio da requisição de leitura");
                     }
                     break;
 
                 case FCT_READINGRES:
-                    if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                        //aqui o router envia a resposta de leitura para a app
-                        String src = String(txMsg.src);
-                        String dst = String(loramesh.mydd.devaddr);
-                        String fct = String(txMsg.function);
-                        String param = String(txMsg.start); // exemplo de leitura do primeiro byte do payload
-                        String val = String(txMsg.value); // exemplo de leitura do segundo byte do payload
-                        SendMessage(src,dst,fct,param,val);
-                    }
-
-                    else{ //end device
+                    if(loramesh.mydd.devtype == DEV_TYPE_ENDDEV){ //end device
                         //ed envia a resposta para o router
                         //payload é um buffer para guardar o valor lido
-                        if(loramesh.sendReadingRes(txMsg.dst, txMsg.size, txMsg.payload))
-                            log_i("txMsg.dst: %d txMsg.size: %d txMsg.payload: %d",txMsg.dst,txMsg.size,txMsg.payload[3]); 
+                        if(loramesh.sendReadingRes(msg.dst, msg.size, msg.data.bytes))
+                            log_i("Resposta enviada! msg.dst: %d msg.size: %d msg.data.bytes: %d",msg.dst,msg.size,msg.data.bytes); 
+                        else                      
+                            log_i("Erro no envio da resposta de leitura");
                     }
                     break;
 
                 case FCT_WRITINGREQ:
                     if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                        if (loramesh.sendWrittingReq(txMsg.dst, txMsg.start,txMsg.qtdParametros,txMsg.value))
-                            log_i("txMsg.dst: %d txMsg.start: %d txMsg.qtdParametros: %d txMsg.value: %d",txMsg.dst,txMsg.start,txMsg.qtdParametros,txMsg.value);
+                        if (loramesh.sendWrittingReq(msg.dst, msg.start,msg.qtdParametros,msg.data.value))
+                            log_i("msg.dst: %d msg.start: %d msg.qtdParametros: %d msg.value: %d",msg.dst,msg.start,msg.qtdParametros,msg.data.value);
                         else
                             log_i("Erro no envio da requisição de escrita");
                     } 
                     break;
                 case FCT_WRITINGRES:
-                    if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                        //aqui o router envia a resposta de escrita para a app
-                        String src = String(rxMsg.src);
-                        String dst = String(loramesh.mydd.devaddr);
-                        String fct = String(rxMsg.function);
-                        String param = ""; // exemplo de leitura do primeiro byte do payload
-                        String val = (loramesh.getWrittingCode() == 1) ? "Success" : "Failure"; // exemplo de leitura do segundo byte do payload
-                        SendMessage(src,dst,fct,param,val);
-                    }
-
-                    else{ //end device
-                        if (loramesh.sendWrittingRes(txMsg.dst, 1)) //envia código de status 1 (sucesso)
-                            log_i("txMsg.dst: %d",txMsg.dst); 
+                    if(loramesh.mydd.devtype == DEV_TYPE_ENDDEV){ //end device
+                        if (loramesh.sendWrittingRes(msg.dst, msg.data.value)) 
+                            log_i("msg.dst: %d status: %d",msg.dst, (msg.data.value == 1) ? "Sucesso" : "Falha"); 
                         else
                             log_i("Erro no envio da resposta de escrita");
                     }
@@ -169,13 +153,17 @@ void CommTask(void* pvParameters) {
         }
 
         if (loramesh.receivePacket()) {
-            rxMsg.src = loramesh.lastpkt.srcaddress;
-            rxMsg.function = loramesh.lastpkt.fct;
-            rxMsg.size = loramesh.lastpkt.packetSize;
-            memcpy(rxMsg.payload, loramesh.lastpkt.rxpacket, rxMsg.size);
-            rxMsg.rssi = loramesh.packetRssi();
+            //aqui talvez seria interessante descompactar a mensagem recebida em lastpkt para envia-la pelas tarefas atraves da estrtutura msg
+            msg.src = loramesh.getSrcAdress();
+            msg.function = loramesh.getFunctionCode();
+            msg.start = loramesh.getStart();
+            msg.qtdParametros = loramesh.getQtdParametros();
+            msg.data.value = loramesh.getReadingDataAsUint32();
+            msg.size = loramesh.getSizeMsg();
 
-            xQueueSend(rxQueue, &rxMsg, 0);
+            
+            // msg.rssi = loramesh.packetRssi(); //o que e esse rssi?
+            xQueueSend(q_comm2app, &msg, 0);
         }
 
         vTaskDelay(10 / portTICK_PERIOD_MS);

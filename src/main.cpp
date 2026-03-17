@@ -36,6 +36,10 @@ float TensaoDeSaida = 0;
 
 QueueHandle_t txQueue;    //App transmite para comunicacao
 QueueHandle_t rxQueue;    //Comunicacao responde para App
+QueueHandle_t q_tcp2app;   //Tcp transmite para app
+QueueHandle_t q_app2tcp;   //app transmite para tcp
+QueueHandle_t q_app2comm;  //app trasmite para comm
+QueueHandle_t q_comm2app;  //comm transmite para app
 
 uint16_t idx_response = 0;
 
@@ -115,6 +119,19 @@ void setup() {
     Heltec.begin();
     loramesh.begin();
 
+
+    q_app2comm = xQueueCreate(10, sizeof(msg_t));
+    if (q_app2comm == NULL) 
+        Serial.println("Falha ao criar fila q_app2comm!");
+    q_comm2app = xQueueCreate(10, sizeof(msg_t));
+    if (q_comm2app == NULL) 
+        Serial.println("Falha ao criar fila q_comm2app!");
+    q_app2tcp = xQueueCreate(10, sizeof(msg_t));
+    if (q_app2tcp == NULL) 
+        Serial.println("Falha ao criar fila q_app2tcp!");
+    q_tcp2app = xQueueCreate(10, sizeof(msg_t));
+    if (q_tcp2app == NULL) 
+        Serial.println("Falha ao criar fila q_tcp2app!");    
     txQueue = xQueueCreate(10, sizeof(TxMessage_t));
     if (txQueue == NULL) 
         Serial.println("Falha ao criar fila txQueue!");

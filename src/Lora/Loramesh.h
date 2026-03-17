@@ -59,16 +59,9 @@ typedef struct  {
     uint8_t  devtype;
     uint8_t  devaddr;
     uint8_t  dataslot;
-    uint16_t  seqnum;
+    uint16_t seqnum;
 } strDevicedescription;
 
-// Fila para armazenar mensagens recebidas
-//estrutura não utilizada no código
-// typedef struct {
-//     uint8_t buffer[BUFFER_SIZE];
-//     uint8_t length;
-//     uint8_t slot;
-// } RxMessage;
 
 typedef enum {
    DEV_TYPE_ROUTER=1,
@@ -95,6 +88,12 @@ typedef enum  {
     ST_STANDBY,
     ST_STARTRX,
 }statemac;
+
+//paremtros disponiveis
+typedef enum{
+    LEDP = 1,
+    POT = 2
+}parametercode;
 
 #if defined (__STM32F1__)
 inline unsigned char  digitalPinToInterrupt(unsigned char Interrupt_pin) { return Interrupt_pin; } //This isn't included in the stm32duino libs (yet)
@@ -154,6 +153,14 @@ public:
   uint8_t getResponseStatus(void);
   uint32_t getReadingDataAsUint32(void); // obtem o valor de leitura
   uint8_t getWrittingCode(void);
+
+  uint8_t getSrcAdress();
+  uint8_t getFunctionCode();
+  uint8_t getStart();
+  uint8_t getQtdParametros();
+  uint8_t getSizeMsg();
+
+
  
 
   void clearBuffer(uint8_t *buffer, int size);
