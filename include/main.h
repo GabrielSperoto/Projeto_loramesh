@@ -22,28 +22,7 @@ extern QueueHandle_t q_app2tcp;   //app transmite para tcp
 extern QueueHandle_t q_app2comm;  //app trasmite para comm
 extern QueueHandle_t q_comm2app;  //comm transmite para app
 
-typedef enum {
-    TCP,
-    APP,
-    LORA
-} origem_t;
 
-typedef union {
-    uint8_t bytes[4];
-    uint32_t value;
-} data_t;
-
-typedef struct{
-    origem_t origem; //indica a origem da mensagem (TCP, APP ou LORA)
-    uint8_t src;
-    uint8_t dst;
-    uint8_t function;
-    uint8_t start;
-    uint8_t qtdParametros; //start e qtdParametros fazem parte do pacote de requisição 
-    data_t data; //valor usado na escrita ou leitura
-    uint8_t size;
-    bool ocupado; //indica se o slot está ocupado ou não
-} msg_t;
 
 typedef struct {
     uint8_t src;

@@ -43,16 +43,39 @@
 void LoraSendFrame(String data,size_t len);
 uint8_t LoraReceiveFrame(char *pframe);
 
-typedef struct {
-    uint8_t srcaddress;
-    uint8_t dstaddress;
-    uint8_t fct;
-    uint16_t seqnum=0;
-    // uint32_t timestamp;
-    uint8_t packetSize;
-    uint8_t rxpacket[BUFFER_SIZE];
+// O __attribute__((packed)) garante que a estrutura tenha o tamanho exato dos bytes somados
+typedef struct __attribute__((packed)) {
+    // uint8_t  srcaddress;
+    // uint8_t  dstaddress;
+    // uint8_t  fct;
+    // uint16_t seqnum;
+    uint8_t  packetSize;
+    uint8_t  payload[BUFFER_SIZE]; // Troquei de rxpacket para payload
 } strPacket;
 
+typedef enum {
+    TCP,
+    APP,
+    LORA
+} origem_t;
+
+typedef union {
+    uint8_t bytes[4];
+    uint32_t value;
+} payload_t;
+
+typedef struct{
+    origem_t origem; //indica a origem da mensagem (TCP, APP ou LORA)
+    uint8_t dst;
+    uint8_t src;
+    uint16_t seqnum;
+    uint8_t function;
+    uint8_t start;
+    uint8_t qtdParametros; //start e qtdParametros fazem parte do pacote de requisição 
+    uint8_t size;
+    payload_t payload; //valor usado na escrita ou leitura
+    bool ocupado; //indica se o slot está ocupado ou não
+} msg_t;
 
 typedef struct  {
     uint16_t devserialnumber;
@@ -70,23 +93,19 @@ typedef enum {
 
 typedef enum {
    FCT_BEACON=1,
-   FCT_JOIN,
-   FCT_SYNC_SUCESS, // achei um nome mais adequado para um resposta de beacon
+   FCT_JOIN, 
    FCT_DESCRIPTION,
-   FCT_READINGREQ,
-    FCT_READINGRES,
-   FCT_WRITINGREQ,
-   FCT_WRITINGRES
+   FCT_READING,
+   FCT_WRITTING
 } functioncode;
 
 typedef enum  {
-    ST_BEACONREQUEST=0,
-    ST_BEACONRESPONSE,
     ST_TXBEACON,
-    ST_RXWAIT,
-    ST_TXDATA,
-    ST_STANDBY,
     ST_STARTRX,
+    ST_RXWAIT,
+    ST_STARTTX,
+    ST_TXDATA,
+    ST_STANDBY
 }statemac;
 
 //paremtros disponiveis
@@ -113,6 +132,7 @@ class LoRaClass : public Stream {
 public:
   strDevicedescription mydd;
   strPacket lastpkt;
+  msg_t msg;
 
   LoRaClass();
 
@@ -137,6 +157,7 @@ public:
   uint8_t sendReadingRes(uint8_t dst, uint8_t size, uint8_t *buf); //envio de uma resposta de leitura
   uint8_t sendWrittingReq(uint8_t dst, uint8_t start, uint8_t qtdParametros, uint8_t value); 
   uint8_t sendWrittingRes(uint8_t dst, uint8_t status);
+  void decodeLoraPacket();
 
 
   void setDioActionsForReceivePacket(void);

@@ -111,38 +111,35 @@ void CommTask(void* pvParameters) {
                     loramesh.sendBeacon(millis());
                     break;
 
-                case FCT_READINGREQ:
+                case FCT_READING:
                     if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
                         if (loramesh.sendReadingReq(msg.dst, msg.start,msg.qtdParametros))
                             log_i("msg.dst: %d msg.start: %d msg.qtdParametros: %d",msg.dst,msg.start,msg.qtdParametros);
                         else
                             log_i("Erro no envio da requisição de leitura");
                     }
-                    break;
-
-                case FCT_READINGRES:
-                    if(loramesh.mydd.devtype == DEV_TYPE_ENDDEV){ //end device
+                    
+                    else{ //end device
                         //ed envia a resposta para o router
                         //payload é um buffer para guardar o valor lido
-                        if(loramesh.sendReadingRes(msg.dst, msg.size, msg.data.bytes))
-                            log_i("Resposta enviada! msg.dst: %d msg.size: %d msg.data.bytes: %d",msg.dst,msg.size,msg.data.bytes); 
+                        if(loramesh.sendReadingRes(msg.dst, msg.size, msg.payload.bytes))
+                            log_i("Resposta enviada! msg.dst: %d msg.size: %d msg.data.bytes: %d",msg.dst,msg.size,msg.payload.bytes); 
                         else                      
                             log_i("Erro no envio da resposta de leitura");
                     }
                     break;
 
-                case FCT_WRITINGREQ:
+                case FCT_WRITTING:
                     if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                        if (loramesh.sendWrittingReq(msg.dst, msg.start,msg.qtdParametros,msg.data.value))
-                            log_i("msg.dst: %d msg.start: %d msg.qtdParametros: %d msg.value: %d",msg.dst,msg.start,msg.qtdParametros,msg.data.value);
+                        if (loramesh.sendWrittingReq(msg.dst, msg.start,msg.qtdParametros,msg.payload.value))
+                            log_i("msg.dst: %d msg.start: %d msg.qtdParametros: %d msg.value: %d",msg.dst,msg.start,msg.qtdParametros,msg.payload.value);
                         else
                             log_i("Erro no envio da requisição de escrita");
                     } 
-                    break;
-                case FCT_WRITINGRES:
-                    if(loramesh.mydd.devtype == DEV_TYPE_ENDDEV){ //end device
-                        if (loramesh.sendWrittingRes(msg.dst, msg.data.value)) 
-                            log_i("msg.dst: %d status: %d",msg.dst, (msg.data.value == 1) ? "Sucesso" : "Falha"); 
+
+                    else{ //end device
+                        if (loramesh.sendWrittingRes(msg.dst, msg.payload.value)) 
+                            log_i("msg.dst: %d status: %d",msg.dst, (msg.payload.value == 1) ? "Sucesso" : "Falha"); 
                         else
                             log_i("Erro no envio da resposta de escrita");
                     }
@@ -158,7 +155,7 @@ void CommTask(void* pvParameters) {
             msg.function = loramesh.getFunctionCode();
             msg.start = loramesh.getStart();
             msg.qtdParametros = loramesh.getQtdParametros();
-            msg.data.value = loramesh.getReadingDataAsUint32();
+            msg.payload.value = loramesh.getReadingDataAsUint32();
             msg.size = loramesh.getSizeMsg();
 
             
