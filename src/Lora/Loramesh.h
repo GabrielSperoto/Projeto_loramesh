@@ -157,7 +157,8 @@ public:
   uint8_t sendReadingRes(uint8_t dst, uint8_t size, uint8_t *buf); //envio de uma resposta de leitura
   uint8_t sendWrittingReq(uint8_t dst, uint8_t start, uint8_t qtdParametros, uint8_t value); 
   uint8_t sendWrittingRes(uint8_t dst, uint8_t status);
-  void decodeLoraPacket();
+  void decodeLoraPacket(msg_t *msg);
+  uint8_t encodeAndSendPacket(msg_t *msg);
 
 
   void setDioActionsForReceivePacket(void);

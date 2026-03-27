@@ -133,14 +133,14 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     msg.function = function_num;
     msg.start = param_num;
     msg.qtdParametros = 1;
-    msg.data.value = val_num;
+    msg.payload.value = val_num;
     msg.size = sizeof(val_num);
     msg.ocupado = true;
 
     // xQueueSend(rxQueue, &rxMsg, 0); a mensagem é enviada pela fila q_tcp_tx
     xQueueSend(q_tcp2app,&msg,0);
   
-    log_i("Queue enviada. Src: %d, Dst: %d, Fct: %d, Param: %d, Val: %d", src_addr, dst_addr, function_num, param_num, msg.data.value);
+    log_i("Queue enviada. Src: %d, Dst: %d, Fct: %d, Param: %d, Val: %d", src_addr, dst_addr, function_num, param_num, msg.payload.value);
 
     //a mensagem é agora enviada pela rede
 

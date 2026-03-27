@@ -626,248 +626,336 @@ uint8_t LoRaClass::getSizeMsg(){
 */
 
 
-void LoRaClass::decodeLoraPacket(){
+void LoRaClass::decodeLoraPacket(msg_t *msg){
   uint8_t *rxPacket = lastpkt.payload;
   uint8_t size = lastpkt.packetSize;
 
-  msg.origem = LORA;
-  msg.dst = rxPacket[0];
-  msg.src = rxPacket[1];
-  msg.seqnum = (rxPacket[3] << 8) | rxPacket[2];
-  msg.function = rxPacket[4];
-  
+  msg->origem = LORA;
+  msg->dst = rxPacket[0];
+  msg->src = rxPacket[1];
+  msg->seqnum = (rxPacket[3] << 8) | rxPacket[2];
+  msg->function = rxPacket[4];
 
-  log_i("seqnum: %d",msg.seqnum);
+  
+  // msg.size = rxPacket[7];
+
+  log_i("seqnum: %d",msg->seqnum);
 
   if(mydd.devtype == DEV_TYPE_ROUTER){
-    switch (msg.function)
+    //pacote de respsota não possui nem o campo start nem o qtd Parametros
+    msg->size = rxPacket[5];
+    switch (msg->function)
         {
             case FCT_BEACON:
                 //aqui o router recebe o beacon dos end devices, entao ele pode atualizar a tabela de rotas e enviar mensagens para os end devices
                 //log_i("Received BEACON from device %d", getSrcAdress());
-                msg.payload.value = rxPacket
+                // msg.size = rxPacket[5];
+                msg->payload.value = gettimestamp(rxPacket,size);
                 break;
 
             case FCT_READING:
                 //aqui o router recebe a requisição de leitura do end device, entao ele deve enviar a requisição para o dispositivo destino
                 //log_i("Received READING REQUEST from device %d", getSrcAdress());
+                // msg.size = rxPacket[5];
+                msg->payload.value = getReadingDataAsUint32();
                 break;
 
             case FCT_WRITTING:
                 //aqui o router recebe a requisição de escrita do end device, entao ele deve enviar a requisição para o dispositivo destino
                 //log_i("Received WRITTING REQUEST from device %d", getSrcAdress());
+                // msg.size = rxPacket[5];
+                msg->payload.value = getWrittingCode();
+                break;
+            case FCT_DESCRIPTION:
+                //aqui o router recebe a requisição de descrição do end device, entao ele deve enviar a resposta com a descrição do dispositivo
+                //log_i("Received DESCRIPTION REQUEST from device %d", getSrcAdress());
                 break;
             default:
-                log_w("Funcao nao suportada: %d", msg.function);
+                log_w("Funcao nao suportada: %d", msg->function);
         }
+    
   }
   else{ //end device 
+    switch(msg->function)
+        {
+            case FCT_BEACON:
+                //aqui o end device recebe o beacon do router, entao ele pode atualizar a tabela de rotas e enviar mensagens para o router
+                //log_i("Received BEACON from device %d", getSrcAdress());
+                // msg.size = 4;
+                msg->payload.value = gettimestamp(rxPacket,size);
+                break;
 
+            case FCT_READING:
+                //aqui o router nao enviar nenhum valor para o payload, por isso ele fica vazio
+                msg->start = rxPacket[5];
+                msg->qtdParametros = rxPacket[6];
+                msg->size = 0;
+                msg->payload.value = 0;
+                break;
+
+            case FCT_WRITTING:
+                //aqui o end device recebe a requisição de escrita do router, entao ele deve enviar a resposta com o status da escrita
+                //log_i("Received WRITTING REQUEST from device %d", getSrcAdress());
+                // msg.size = 1;
+                msg->start = rxPacket[5];
+                msg->qtdParametros = rxPacket[6];
+                msg->size = rxPacket[7];
+                msg->payload.value = getWrittingCode();
+                log_i("Writting code: %d", msg->payload.value);
+                break;
+            case FCT_DESCRIPTION:
+                //aqui o end device recebe a requisição de descrição do router, entao ele deve enviar a resposta com a descrição do dispositivo
+                //log_i("Received DESCRIPTION REQUEST from device %d", getSrcAdress());
+                break;
+            default:
+                log_w("Funcao nao suportada: %d", msg->function);
+        }
   }
 
 }
 
+uint8_t LoRaClass::encodeAndSendPacket(msg_t* message) {
+    uint8_t buffer[BUFFER_SIZE];
+    uint8_t pos = 0;
+    
+    // 1. Cabeçalho padrão para todas as mensagens
+    buffer[pos++] = message->dst;     // dst
+    buffer[pos++] = mydd.devaddr;     // src
+    
+    // 2. Tratamento do Sequence Number
+    // Se for requisição/beacon, incrementa o próprio seqnum. Se for resposta, usa o seqnum do pacote recebido
+    uint16_t current_seq;
+    if (message->origem == APP || message->origem == TCP) { 
+      current_seq = mydd.seqnum++; 
+    } else {
+      current_seq = message->seqnum; // Assumindo que é uma resposta
+    }
 
-uint8_t LoRaClass::sendWrittingReq(uint8_t dst, uint8_t start, uint8_t qtdParametros, uint8_t value){
 
-  uint8_t buffer[BUFFER_SIZE];
-  uint8_t* pucaux = (uint8_t*) &mydd.seqnum;
-  uint8_t pos = 0;
-  
-  //monta o pacote de leitura
-  buffer[pos++] = mydd.devaddr;
-  buffer[pos++] = dst;
-  buffer[pos++] = FCT_WRITTING;
-  buffer[pos++] = *(pucaux + 1);
-  buffer[pos++] = *pucaux;
-  buffer[pos++] = start;
-  buffer[pos++] = qtdParametros;
-  buffer[pos++] = value;
-  buffer[pos++] = BYTE_CRC;
+    buffer[pos++] = (current_seq >> 8) & 0xFF; // MSB
+    buffer[pos++] = current_seq & 0xFF;        // LSB
+    
+    buffer[pos++] = message->function;// fct
+    // 3. Serialização do Payload baseada na Função
+    switch (message->function) {
+        case FCT_BEACON:
+            // Serializa o timestamp no payload se necessário
+            break;
+            
+        case FCT_WRITTING:
+            // Diferencia se é requisição ou resposta pelo tamanho esperado ou origem
+            if (mydd.devtype == DEV_TYPE_ROUTER) { // Requisição
+                buffer[pos++] = message->start;
+                buffer[pos++] = message->qtdParametros;
+                buffer[pos++] = message->size; //coloquei o tamanho do payload so por convencão, ja que ele e sempre igual a 1 byte
+                buffer[pos++] = message->payload.value & 0xFF; // valor
+            } else { // Resposta do End Device
+                buffer[pos++] = message->size;
+                buffer[pos++] = message->payload.value & 0xFF; // status
+            }
+            break;
+            
+        case FCT_READING:
+            if (mydd.devtype == DEV_TYPE_ROUTER) { // Requisição
+                // Nenhum dado extra ou apenas start/qtdParametros
+                buffer[pos++] = message->start;
+                buffer[pos++] = message->qtdParametros;
+            } else { // Resposta
+                buffer[pos++] = message->size;
+                for (int i = 0; i < message->size; i++) {
+                    buffer[pos++] = message->payload.bytes[i];
+                }
+            }
+            break;
+    }
 
-  uint8_t ret = sendPacket(buffer,pos);
+    // 4. Fechamento do frame
+    buffer[pos++] = BYTE_CRC;
 
-  // // log_i("Reading Request: %2X %2X %2X %2X %2X %2X %2X %2X %2X",buffer[0],buffer[1],buffer[2],buffer[3],buffer[4],buffer[5],buffer[6],buffer[7],buffer[8]);
-
-  if(ret) return pos;
-  else return 0;
- 
+    // 5. Envio físico
+    if (sendPacket(buffer, pos)) {
+        log_i("Pacote enviado com sucesso, tamanho: %d", pos);
+        // Retorna a rádio para modo de recepção, se necessário
+        return pos;
+    }
+    return 0;
 }
 
 /* Formato de uma resposta de escrita
   {src,dst,fct,seq number, status,crc}
 */
-uint8_t LoRaClass::sendWrittingRes(uint8_t dst, uint8_t status){
-  uint8_t buffer[BUFFER_SIZE];
-  uint8_t* pucaux = (uint8_t*) &lastpkt.seqnum;
-  uint8_t pos = 0;
 
-  buffer[pos++] = mydd.devaddr;
-  buffer[pos++] = dst;
-  buffer[pos++] = FCT_WRITTING;
-  buffer[pos++] = *(pucaux + 1);
-  buffer[pos++] = *pucaux;
-  buffer[pos++] = status;
-  buffer[pos++] = BYTE_CRC;
+// uint8_t LoRaClass::sendWrittingRes(uint8_t dst, uint8_t status){
+//   uint8_t buffer[BUFFER_SIZE];
+//   uint8_t* pucaux = (uint8_t*) &lastpkt.seqnum;
+//   uint8_t pos = 0;
 
-  log_i("Writting Response: %2X %2X %2X %2X %2X %2X %2X",buffer[0],buffer[1],buffer[2],buffer[3],buffer[4],buffer[5],buffer[6]);
+//   buffer[pos++] = mydd.devaddr;
+//   buffer[pos++] = dst;
+//   buffer[pos++] = FCT_WRITTING;
+//   buffer[pos++] = *(pucaux + 1);
+//   buffer[pos++] = *pucaux;
+//   buffer[pos++] = status;
+//   buffer[pos++] = BYTE_CRC;
 
-  uint8_t ret = sendPacket(buffer,pos);
-  if(ret) return pos;
-  return 0;
-}
+//   log_i("Writting Response: %2X %2X %2X %2X %2X %2X %2X",buffer[0],buffer[1],buffer[2],buffer[3],buffer[4],buffer[5],buffer[6]);
 
-uint8_t LoRaClass::sendBeacon(long timestamp)
-{
-    uint8_t ret=0;
-    uint8_t pos=0;
-    uint8_t buf[BUFFER_SIZE];
-    uint8_t *pucaux = (uint8_t *) &mydd.seqnum;
+//   uint8_t ret = sendPacket(buffer,pos);
+//   if(ret) return pos;
+//   return 0;
+// }
 
-    mydd.seqnum++;
+// uint8_t LoRaClass::sendBeacon(long timestamp)
+// {
+//     uint8_t ret=0;
+//     uint8_t pos=0;
+//     uint8_t buf[BUFFER_SIZE];
+//     uint8_t *pucaux = (uint8_t *) &mydd.seqnum;
 
-    buf[pos++] =  mydd.devaddr;
-    buf[pos++] =  BROADCAST_ADDR;
-    buf[pos++] =  FCT_BEACON;
-    buf[pos++] =  *(pucaux+1);
-    buf[pos++] =  *(pucaux+0);
-    pucaux = (uint8_t *) &timestamp;
-    buf[pos++] =  *(pucaux+3);
-    buf[pos++] =  *(pucaux+2);
-    buf[pos++] =  *(pucaux+1);
-    buf[pos++] =  *(pucaux+0);
-    buf[pos++] =  BYTE_CRC;
+//     mydd.seqnum++;
 
-    ret = sendPacket(buf,pos);
-    if (ret){
-       //vTaskDelay(10 / portTICK_PERIOD_MS);
-       //int res = startReceiving(0);
-       //if (res > 0){
-       //   log_e("Error startReceiving=%d",res);
-       //   return 0;
-       //}
-       log_i("BEACON [%d] = %2x %2x %2x %2x %2x", pos, buf[0], buf[1],buf[2],buf[3], buf[4]);
-       return pos;
-    }
-    else
-       return 0;   
-}
+//     buf[pos++] =  mydd.devaddr;
+//     buf[pos++] =  BROADCAST_ADDR;
+//     buf[pos++] =  FCT_BEACON;
+//     buf[pos++] =  *(pucaux+1);
+//     buf[pos++] =  *(pucaux+0);
+//     pucaux = (uint8_t *) &timestamp;
+//     buf[pos++] =  *(pucaux+3);
+//     buf[pos++] =  *(pucaux+2);
+//     buf[pos++] =  *(pucaux+1);
+//     buf[pos++] =  *(pucaux+0);
+//     buf[pos++] =  BYTE_CRC;
+
+//     ret = sendPacket(buf,pos);
+//     if (ret){
+//        //vTaskDelay(10 / portTICK_PERIOD_MS);
+//        //int res = startReceiving(0);
+//        //if (res > 0){
+//        //   log_e("Error startReceiving=%d",res);
+//        //   return 0;
+//        //}
+//        log_i("BEACON [%d] = %2x %2x %2x %2x %2x", pos, buf[0], buf[1],buf[2],buf[3], buf[4]);
+//        return pos;
+//     }
+//     else
+//        return 0;   
+// }
 
 
-uint8_t LoRaClass::sendReadingReq(uint8_t dstaddr,uint8_t start, uint8_t qtdParametros)
-{
-    uint8_t ret=0;
-    uint8_t pos=0;
-    uint8_t buf[BUFFER_SIZE];
-    uint8_t *pucaux = (uint8_t *) &mydd.seqnum;
+// uint8_t LoRaClass::sendReadingReq(uint8_t dstaddr,uint8_t start, uint8_t qtdParametros)
+// {
+//     uint8_t ret=0;
+//     uint8_t pos=0;
+//     uint8_t buf[BUFFER_SIZE];
+//     uint8_t *pucaux = (uint8_t *) &mydd.seqnum;
 
-    buf[pos++] =  mydd.devaddr;
-    buf[pos++] =  dstaddr;
-    buf[pos++] =  FCT_READING;
-    buf[pos++] =  *(pucaux+1);
-    buf[pos++] =  *(pucaux+0);
-    buf[pos++] =  BYTE_CRC;
+//     buf[pos++] =  mydd.devaddr;
+//     buf[pos++] =  dstaddr;
+//     buf[pos++] =  FCT_READING;
+//     buf[pos++] =  *(pucaux+1);
+//     buf[pos++] =  *(pucaux+0);
+//     buf[pos++] =  BYTE_CRC;
 
-    ret = sendPacket(buf,pos);
-    if (ret){
-       //vTaskDelay(20 / portTICK_PERIOD_MS);
-       //uint32_t rx_timeout = (mydd.devtype == DEV_TYPE_ROUTER) ? 0 : 2000; 
-       //int res= startReceiving(rx_timeout);
-       //if (res > 0){
-       //   log_e("Error startReceiving=%d",res);
-       //   return 0;
-       //}
-       log_i("Data.REQ [%d] = %2x %2x %2x %2x %2x", pos, buf[0], buf[1],buf[2],buf[3], buf[4]);
-       return pos;
-    }
-    else
-       return 0;   
-}
+//     ret = sendPacket(buf,pos);
+//     if (ret){
+//        //vTaskDelay(20 / portTICK_PERIOD_MS);
+//        //uint32_t rx_timeout = (mydd.devtype == DEV_TYPE_ROUTER) ? 0 : 2000; 
+//        //int res= startReceiving(rx_timeout);
+//        //if (res > 0){
+//        //   log_e("Error startReceiving=%d",res);
+//        //   return 0;
+//        //}
+//        log_i("Data.REQ [%d] = %2x %2x %2x %2x %2x", pos, buf[0], buf[1],buf[2],buf[3], buf[4]);
+//        return pos;
+//     }
+//     else
+//        return 0;   
+// }
 
-//função implementada para enviar valores inteiros (2 bytes)
+// //função implementada para enviar valores inteiros (2 bytes)
 
-uint8_t LoRaClass::sendReadingRes(uint8_t dst, uint8_t size, uint8_t *readingValue){
-  uint8_t buffer[BUFFER_SIZE];
-  uint8_t* pucaux = (uint8_t*) &lastpkt.seqnum;
-  uint8_t aux = 0, i=0;
+// uint8_t LoRaClass::sendReadingRes(uint8_t dst, uint8_t size, uint8_t *readingValue){
+//   uint8_t buffer[BUFFER_SIZE];
+//   uint8_t* pucaux = (uint8_t*) &lastpkt.seqnum;
+//   uint8_t aux = 0, i=0;
 
-  buffer[aux++] = mydd.devaddr;
-  buffer[aux++] = dst;
-  buffer[aux++] = FCT_READING;
-  buffer[aux++] = *(pucaux + 1);
-  buffer[aux++] = *pucaux;
-  buffer[aux++] = size;
+//   buffer[aux++] = mydd.devaddr;
+//   buffer[aux++] = dst;
+//   buffer[aux++] = FCT_READING;
+//   buffer[aux++] = *(pucaux + 1);
+//   buffer[aux++] = *pucaux;
+//   buffer[aux++] = size;
 
-  pucaux = readingValue;
+//   pucaux = readingValue;
   
-  for (i=0;i<size;i++){
-      buffer[aux++] = *(pucaux++);
-  }
-//  pucaux = (uint8_t*) &value;
-//  buffer[aux++] = *(pucaux+3);
-//  buffer[aux++] = *(pucaux+2);
-//  buffer[aux++] = *(pucaux+1);
-//  buffer[aux++] = *(pucaux);
-  buffer[aux++] = BYTE_CRC;
+//   for (i=0;i<size;i++){
+//       buffer[aux++] = *(pucaux++);
+//   }
+// //  pucaux = (uint8_t*) &value;
+// //  buffer[aux++] = *(pucaux+3);
+// //  buffer[aux++] = *(pucaux+2);
+// //  buffer[aux++] = *(pucaux+1);
+// //  buffer[aux++] = *(pucaux);
+//   buffer[aux++] = BYTE_CRC;
 
-  if(loramesh.sendPacket(buffer,aux)){
-     vTaskDelay(20 / portTICK_PERIOD_MS);
+//   if(loramesh.sendPacket(buffer,aux)){
+//      vTaskDelay(20 / portTICK_PERIOD_MS);
 
-     uint32_t rx_timeout = (mydd.devtype == DEV_TYPE_ROUTER) ? 0 : 2000; 
-     int res= startReceiving(rx_timeout);
-     if (res > 0){
-       log_e("Error startReceiving=%d",res);
-       return 0;
-     }
+//      uint32_t rx_timeout = (mydd.devtype == DEV_TYPE_ROUTER) ? 0 : 2000; 
+//      int res= startReceiving(rx_timeout);
+//      if (res > 0){
+//        log_e("Error startReceiving=%d",res);
+//        return 0;
+//      }
 
-     log_i("Data.RES [%d] = %2x %2x %2x %2x %2x", aux, buffer[5], buffer[6],buffer[7],buffer[8], buffer[9]);
-     return 1;
-  }
-  else
-    return 0;
-}
+//      log_i("Data.RES [%d] = %2x %2x %2x %2x %2x", aux, buffer[5], buffer[6],buffer[7],buffer[8], buffer[9]);
+//      return 1;
+//   }
+//   else
+//     return 0;
+// }
 
-uint8_t LoRaClass::sendBeacontRes(uint8_t dstaddr)
-{
-    uint8_t ret=0;
-    uint8_t pos=0;
-    uint8_t buf[BUFFER_SIZE];
-    uint8_t *pucaux = (uint8_t *) &lastpkt.seqnum; 
+// uint8_t LoRaClass::sendBeacontRes(uint8_t dstaddr)
+// {
+//     uint8_t ret=0;
+//     uint8_t pos=0;
+//     uint8_t buf[BUFFER_SIZE];
+//     uint8_t *pucaux = (uint8_t *) &lastpkt.seqnum; 
 
-    buf[pos++] =  mydd.devaddr;
-    buf[pos++] =  dstaddr;
-    buf[pos++] =  FCT_BEACON;
-    buf[pos++] =  *(pucaux+1);
-    buf[pos++] =  *(pucaux+0);
-    buf[pos++] =  BYTE_CRC;
+//     buf[pos++] =  mydd.devaddr;
+//     buf[pos++] =  dstaddr;
+//     buf[pos++] =  FCT_BEACON;
+//     buf[pos++] =  *(pucaux+1);
+//     buf[pos++] =  *(pucaux+0);
+//     buf[pos++] =  BYTE_CRC;
 
-#if 1
-    ret = sendPacket(buf,pos);
-    if (ret){
-        vTaskDelay(20 / portTICK_PERIOD_MS);
+// #if 1
+//     ret = sendPacket(buf,pos);
+//     if (ret){
+//         vTaskDelay(20 / portTICK_PERIOD_MS);
 
-        uint32_t rx_timeout = (mydd.devtype == DEV_TYPE_ROUTER) ? 0 : 2000; 
-        int res= startReceiving(rx_timeout);
-        if (res > 0){
-          log_e("Error startReceiving=%d",res);
-          return 0;
-        }
+//         uint32_t rx_timeout = (mydd.devtype == DEV_TYPE_ROUTER) ? 0 : 2000; 
+//         int res= startReceiving(rx_timeout);
+//         if (res > 0){
+//           log_e("Error startReceiving=%d",res);
+//           return 0;
+//         }
 
-       log_i("RES[%d]=%2x %2x %2x %2x %2x %2x %2x %2x", pos, buf[0], buf[1],buf[2],buf[3], buf[4], buf[5],buf[6],buf[7]);
-       return pos;
-    }
-    else
-       return 0;   
-#else
-  loramesh.beginPacket();
-  //print: adiciona os dados no pacote
-  for (int i = 0; i < sizeof(frame1); i++) {
-      loramesh.write((uint8_t)txpacket[i]);
-  }
-  loramesh.endPacket(); //retorno= 1:sucesso | 0: falha
+//        log_i("RES[%d]=%2x %2x %2x %2x %2x %2x %2x %2x", pos, buf[0], buf[1],buf[2],buf[3], buf[4], buf[5],buf[6],buf[7]);
+//        return pos;
+//     }
+//     else
+//        return 0;   
+// #else
+//   loramesh.beginPacket();
+//   //print: adiciona os dados no pacote
+//   for (int i = 0; i < sizeof(frame1); i++) {
+//       loramesh.write((uint8_t)txpacket[i]);
+//   }
+//   loramesh.endPacket(); //retorno= 1:sucesso | 0: falha
 
-#endif    
-}
+// #endif    
+// }
 
 
 bool LoRaClass::receivePacket()

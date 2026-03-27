@@ -84,7 +84,7 @@ void applicationTask(void* pvParameters) {
                     msg.origem = APP;
                     msg.dst = BROADCAST_ADDR;
                     msg.function = FCT_BEACON;
-                    msg.size = 0;
+                    msg.size = 4;
 
                     nextstate = ST_TXDATA;
 
@@ -193,7 +193,7 @@ void applicationTask(void* pvParameters) {
                             case FCT_WRITTING:
                                 //verifica o paramtro da escrita
                                 if(msg.start == LEDP){
-                                    if (msg.data.value == 1){
+                                    if (msg.payload.value == 1){
                                         log_i("Led Aceso!");
                                         digitalWrite(PinLed, HIGH);
 
@@ -208,7 +208,7 @@ void applicationTask(void* pvParameters) {
                                     msg.dst = 0; //endereço do router
                                     msg.function = FCT_WRITTING;
                                     msg.size = 1;
-                                    msg.data.value = 1; //status de sucesso
+                                    msg.payload.value = 1; //status de sucesso
                                     
                                     
                                 }
@@ -219,7 +219,7 @@ void applicationTask(void* pvParameters) {
                                     msg.dst = 0; //endereço do router
                                     msg.function = FCT_WRITTING;
                                     msg.size = 1;
-                                    msg.data.value = 0; //status de erro
+                                    msg.payload.value = 0; //status de erro
         
                                 }
                                 break;
@@ -234,7 +234,7 @@ void applicationTask(void* pvParameters) {
                                     msg.dst = 0; //endereço do router
                                     msg.function = FCT_READING;
                                     msg.size = sizeof(valorPot);
-                                    msg.data.value = valorPot;
+                                    msg.payload.value = valorPot;
                                     
                                 }
                                 else if(msg.start == LEDP){
@@ -244,7 +244,7 @@ void applicationTask(void* pvParameters) {
                                     msg.dst = 0; //endereço do router
                                     msg.function = FCT_READING;
                                     msg.size = 1;
-                                    msg.data.value = digitalRead(PinLed) == HIGH ? 1 : 0; //status do LED
+                                    msg.payload.value = digitalRead(PinLed) == HIGH ? 1 : 0; //status do LED
                                 
                                 }
                                 break;
@@ -398,7 +398,7 @@ void applicationTask(void* pvParameters) {
                         xQueueSend(q_app2tcp, &msg, 0);
 
                         log_i("Mensagem da rede LoRa enviada para o TCP. Origem: %d, Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
-                            msg.origem, msg.src, msg.dst, msg.function, msg.start, msg.qtdParametros, msg.data.value);
+                            msg.origem, msg.src, msg.dst, msg.function, msg.start, msg.qtdParametros, msg.payload.value);
                     }
 
                     else if(msg.origem == APP){
@@ -410,7 +410,7 @@ void applicationTask(void* pvParameters) {
                         }
                         else{
                             log_i("Mensagem interna ignorada. Origem: %d, Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
-                                msg.origem, msg.src, msg.dst, msg.function, msg.start, msg.qtdParametros, msg.data.value);
+                                msg.origem, msg.src, msg.dst, msg.function, msg.start, msg.qtdParametros, msg.payload.value);
 
                         }
                     }
