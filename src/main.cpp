@@ -132,13 +132,15 @@ void setup() {
     q_tcp2app = xQueueCreate(10, sizeof(msg_t));
     if (q_tcp2app == NULL) 
         Serial.println("Falha ao criar fila q_tcp2app!");    
-    txQueue = xQueueCreate(10, sizeof(TxMessage_t));
-    if (txQueue == NULL) 
-        Serial.println("Falha ao criar fila txQueue!");
+   
+    // txQueue = xQueueCreate(10, sizeof(TxMessage_t));
 
-    rxQueue = xQueueCreate(10, sizeof(RxMessage_t));
-    if (rxQueue == NULL) 
-        Serial.println("Falha ao criar fila rxQueue!");
+    // if (txQueue == NULL) 
+    //     Serial.println("Falha ao criar fila txQueue!");
+
+    // rxQueue = xQueueCreate(10, sizeof(RxMessage_t));
+    // if (rxQueue == NULL) 
+    //     Serial.println("Falha ao criar fila rxQueue!");
 
     lastActivityMillis = millis();
 
@@ -171,11 +173,16 @@ void setup() {
 
     //endev
     if (loramesh.mydd.devtype == DEV_TYPE_ENDDEV) {
-        xTaskCreatePinnedToCore(LerPotenciometro, "LerPotenciometroTask", 2048, NULL, 1, &LerPotenciometro_TaskHandle, 1);
+
+        #if 0 //a tarefa é desativada para depuração
+            xTaskCreatePinnedToCore(LerPotenciometro, "LerPotenciometroTask", 2048, NULL, 1, &LerPotenciometro_TaskHandle, 1);
+        #endif
     } 
     else{ // router
+        #if 0 //tarefa é desativada para depuração
         xTaskCreatePinnedToCore(TCP_communicationTask, "TCP_CommunicationTask", 4096, NULL, 2, &TCP_Communication_TaskHandle, 1);
         init_TCP_comm();
+        #endif
     }
     Serial.println("--- Criacao de tarefas finalizada ---\n");
 }

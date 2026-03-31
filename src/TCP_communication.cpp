@@ -44,6 +44,18 @@ void init_TCP_comm() {
 
 void TCP_communicationTask(void* pvParameters){
   while(true){
+
+    if(xQueueReceive(q_app2tcp,&msg, 10/portTICK_PERIOD_MS) == pdTRUE){
+      //descompacta a mensgaem recebida e envia para app
+      String src = String(msg.src);
+      String dst = String(msg.dst);
+      String fct = String(msg.function);
+      String param = String(msg.start);
+      String val = String(msg.payload.value);
+
+      SendMessage(src, dst, fct, param, val);
+      
+    }
     webSocket.loop();
     reconnect();
     vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -132,7 +144,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     msg.dst = dst_addr;
     msg.function = function_num;
     msg.start = param_num;
-    msg.qtdParametros = 1;
+    msg.qtdParametros = 1; //falta à aplicação definir a qtd de parametros
     msg.payload.value = val_num;
     msg.size = sizeof(val_num);
     msg.ocupado = true;

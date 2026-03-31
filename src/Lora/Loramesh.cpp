@@ -555,7 +555,7 @@ uint16_t LoRaClass::getLastSeqNum(){
 
 uint16_t LoRaClass::getLastPctSeqNum(){
 
-    return ((lastpkt.payload[3] << 8) | lastpkt.payload[4]);
+    return ((lastpkt.payload[3] << 8) | lastpkt.payload[2]);
 }
 
 uint8_t LoRaClass::getResponseStatus(){
@@ -732,6 +732,7 @@ uint8_t LoRaClass::encodeAndSendPacket(msg_t* message) {
     }
 
 
+
     buffer[pos++] = (current_seq >> 8) & 0xFF; // MSB
     buffer[pos++] = current_seq & 0xFF;        // LSB
     
@@ -740,6 +741,12 @@ uint8_t LoRaClass::encodeAndSendPacket(msg_t* message) {
     switch (message->function) {
         case FCT_BEACON:
             // Serializa o timestamp no payload se necessário
+              buffer[pos++] = message->size; // tamanho do payload (timestamp tem 4 bytes)
+              // uint8_t* pucaux = (uint8_t*) &message->payload.value;
+              buffer[pos++] = message->payload.bytes[3]; // MSB
+              buffer[pos++] = message->payload.bytes[2];
+              buffer[pos++] = message->payload.bytes[1];
+              buffer[pos++] = message->payload.bytes[0]; // LSB
             break;
             
         case FCT_WRITTING:
@@ -962,6 +969,7 @@ bool LoRaClass::receivePacket()
 {
 
     // formato do pacote recebido [src, dst, fct, seq number, size, payload (data), crc]
+    log_i("Checking for received packets...");
     bool retcrc=0;
     int packetSize = 0;
     uint8_t ret=0;
@@ -996,6 +1004,7 @@ bool LoRaClass::receivePacket()
         fct = lastpkt.payload[2];
         //big endian
         seqnum = getseqnum((uint8_t *)lastpkt.payload,packetSize);
+        mydd.seqnum = seqnum; //atualiza o seqnum do dispositivo com o valor do pacote recebido, para que ele possa usar esse valor para enviar a resposta
 
         //verifica se o srcaddress e dstaddress do pacote sao validos
         // ret = getaddress((uint8_t *)lastpkt.payload,packetSize);
@@ -1137,52 +1146,39 @@ void LoRaClass::implicitHeaderMode()
   writeRegister(RADIOLIB_SX127X_REG_MODEM_CONFIG_1, readRegister(RADIOLIB_SX127X_REG_MODEM_CONFIG_1) | 0x01);
 }
 
-bool LoRaClass::sendPacket(uint8_t* p,uint8_t len) {
+bool LoRaClass::sendPacket(uint8_t* p, uint8_t len) {
     
-    //waitBeforeSend(1);
-
-#if  defined ( WIFI_LoRa_32_V3 )
-
-  clearDioActions();
-  enableCrc();
-
-  int16_t transmissionState = radio.transmit(p,len,1);
-
-  //Start receiving again after sending a packet
-  startReceiving();
-
-  if (transmissionState == RADIOLIB_ERR_NONE) {
-  return true;
-} else {
-  log_e("transmission failed, code=%d ",transmissionState);
-  return false;
-}   
-
-#else  //WIFI_LoRa_32_V2
+    // 1. FORÇA O MODO STANDBY ANTES DE TRANSMITIR
+    // Isso "limpa" o estado do rádio e garante que ele saia do RX com segurança
+    radio.standby(); 
 
     clearDioActions();
     enableCrc();
-    //Blocking transmit, it is necessary due to deleting the packet after sending it. 
-    int transmissionState = radio.transmit(p, len,1);
 
-    ///RFF
-    //log_i("SEND [%d] = %2x %2x %2x %2x %2x", len, p[0], p[1],p[2],p[3], p[4]);
-   
-    //Start receiving again after sending a packet
-    //startReceiving();
-
-   if (transmissionState == RADIOLIB_ERR_NONE) {
-    return true;
-  } else {
-    log_e("transmission failed, code=%d ",transmissionState);
-    return false;
-  }   
-
+    // 2. REMOVA O PARÂMETRO '1' NO FINAL
+    // Deixe apenas o buffer e o tamanho. 
+#if defined ( WIFI_LoRa_32_V3 )
+    int16_t transmissionState = radio.transmit(p, len); 
+#else  //WIFI_LoRa_32_V2
+    int transmissionState = radio.transmit(p, len);
 #endif
 
-    return true;
-}
+    // 3. RETORNA PARA A ESCUTA SE NECESSÁRIO
+    // (Apenas se o dispositivo precisar voltar a escutar imediatamente)
+    // startReceiving(); // Cuidado ao deixar isso aqui se você for usar o Sleep no ED!
 
+    if (transmissionState == RADIOLIB_ERR_NONE) {
+        return true;
+    } else {
+        log_e("transmission failed, code=%d ", transmissionState);
+        
+        // Em caso de falha grave, reiniciar o rádio é uma boa tática de segurança
+        if (transmissionState == RADIOLIB_ERR_TX_TIMEOUT) {
+            restartRadio(); 
+        }
+        return false;
+    }   
+}
 
 
 uint8_t LoRaClass::readRegister(uint8_t address)

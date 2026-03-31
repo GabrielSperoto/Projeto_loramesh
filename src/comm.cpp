@@ -98,6 +98,8 @@ void CommTask(void* pvParameters) {
     msg_t msg;
 
     while (true) {
+
+        log_i("Comm task iniciada. Slot atual: %d", actualslot);
     
        if (xQueueReceive(q_app2comm, &msg, 10 / portTICK_PERIOD_MS) == pdTRUE) {
             log_i("sendmsg devtype=%d slot=%d", loramesh.mydd.devtype, actualslot);
@@ -163,6 +165,8 @@ void CommTask(void* pvParameters) {
             // msg.qtdParametros = loramesh.getQtdParametros();
             // msg.payload.value = loramesh.getReadingDataAsUint32();
             // msg.size = loramesh.getSizeMsg();
+
+            log_i("Pacote recebido! RSSI: %d dBm", loramesh.packetRssi());
 
             loramesh.decodeLoraPacket(&msg);
 
