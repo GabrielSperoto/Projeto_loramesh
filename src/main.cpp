@@ -90,13 +90,13 @@ void setindpolls() {
         lastActivityMillis = millis();
         // log_i("Tx.sn=%d Rx.sn=%d Rx.cnt=%d ", lastmyseqnum, lastpacketseqnum, idx_response);
 
-        #if DISPLAY_ENABLE  
-        {
-            sprintf(display_line3, "Tx=%d Rx=%d", lastmyseqnum, idx_response);
-            Heltec.DisplayShowAll(display_line1, display_line2, display_line3);
-        }   
-        #endif
     }
+    #if DISPLAY_ENABLE  
+    {
+        sprintf(display_line3, "Tx=%d Rx=%d", lastmyseqnum, lastpacketseqnum);
+        Heltec.DisplayShowAll(display_line1, display_line2, display_line3);
+    }   
+    #endif
 }
 
 // --- Definições das Tarefas com todas as correções ---
@@ -144,7 +144,7 @@ void setup() {
 
     lastActivityMillis = millis();
 
-    initcomm();
+    
 
     #if DISPLAY_ENABLE  
         Heltec.DisplayClear();
@@ -184,6 +184,8 @@ void setup() {
         init_TCP_comm();
         #endif
     }
+
+    initcomm();
     Serial.println("--- Criacao de tarefas finalizada ---\n");
 }
 

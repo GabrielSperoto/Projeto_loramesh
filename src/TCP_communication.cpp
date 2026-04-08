@@ -139,7 +139,6 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     // rxMsg.start = param_num;
     // rxMsg.dst = dst_addr;
 
-    msg.origem = TCP;
     msg.src = src_addr;
     msg.dst = dst_addr;
     msg.function = function_num;
@@ -147,7 +146,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     msg.qtdParametros = 1; //falta à aplicação definir a qtd de parametros
     msg.payload.value = val_num;
     msg.size = sizeof(val_num);
-    msg.ocupado = true;
+
 
     // xQueueSend(rxQueue, &rxMsg, 0); a mensagem é enviada pela fila q_tcp_tx
     xQueueSend(q_tcp2app,&msg,0);

@@ -34,7 +34,8 @@ extern char display_line3[20];
 
 bool ledtoogle = 0;
 
-msg_t tcpMsgs[MAX_SLOTS]; // array usado para receber mensagens do TCP e armazenar no slot correspondente
+tcpMsgs_t tcpMsgs[MAX_SLOTS]; // array usado para receber mensagens do TCP e armazenar no slot correspondente
+task_t dstTask; //indica para qual fila a app deve enviar a mensagem
 
 //variaveis usadas em ST_STARTRX
 uint32_t rx_timeout;
@@ -46,7 +47,7 @@ void applicationTask(void* pvParameters) {
     msg_t msgRx;
 
     for(int i=0;i<MAX_SLOTS;i++){
-        memset(&tcpMsgs[i], 0, sizeof(msg_t)); // Limpa a estrutura de cada slot
+        memset(&tcpMsgs[i], 0, sizeof(tcpMsgs_t)); // Limpa a estrutura de cada slot
         tcpMsgs[i].ocupado = false; // inicializa todos os slots como livres
     }
 
@@ -55,14 +56,6 @@ void applicationTask(void* pvParameters) {
         // log_i("Aplication task iniciaida. Slot atual: %d lastslot=%d", actualslot, lastslot);
         
         // log_i("app : slot=%d ns=%d ", actualslot, nextstate);
-        if(actualslot == 0){
-            if(loramesh.mydd.devtype == DEV_TYPE_ROUTER) 
-                nextstate = ST_TXBEACON;
-            else{
-                send_pct = 0;
-                nextstate = ST_STARTRX;
-            } 
-        }
 
         lastActivityMillis = millis();
 
@@ -79,14 +72,13 @@ void applicationTask(void* pvParameters) {
                     memset(&msgTx, 0, sizeof(msg_t)); // Limpa a estrutura msg antes de usá-la
 
                     //montagem do pacote em msg
-                    msgTx.origem = APP;
+                    dstTask = COMM;
                     msgTx.dst = BROADCAST_ADDR;
                     msgTx.src = loramesh.mydd.devaddr;
                     msgTx.seqnum = loramesh.mydd.seqnum; //o seqnum é incrementado na função de envio do pacote
                     msgTx.function = FCT_BEACON;
                     msgTx.size = 4;
                     msgTx.payload.value = millis() & 0xFFFFFFFF; // exemplo de payload, pode ser o timestamp ou outro dado relevante
-                    msgTx.ocupado = true; // marca a mensagem como pronta para envio
 
                     #if DISPLAY_ENABLE
                         sprintf(display_line3,"seqnum: %d",loramesh.mydd.seqnum);
@@ -115,11 +107,12 @@ void applicationTask(void* pvParameters) {
                         // msg.qtdParametros = tcpMsgs[actualslot].qtdParametros;
                         // msg.data = tcpMsgs[actualslot].data;
 
-                        msgTx = tcpMsgs[actualslot];
+                        msgTx = tcpMsgs[actualslot].msg;
+                        dstTask = COMM;
                     
                         log_i("Mensagem pronta para envio no slot %d", actualslot);
-                        log_i("Mensagem detalhes - Origem: %d, Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
-                            msgTx.origem, msgTx.src, msgTx.dst, msgTx.function, msgTx.start, msgTx.qtdParametros, msgTx.payload.value);
+                        log_i("Mensagem detalhes - Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
+                            msgTx.src, msgTx.dst, msgTx.function, msgTx.start, msgTx.qtdParametros, msgTx.payload.value);
 
                         tcpMsgs[actualslot].ocupado = false; // marca o slot como livre
                         nextstate = ST_TXDATA;
@@ -130,6 +123,8 @@ void applicationTask(void* pvParameters) {
                     //seria necessario aqui tambem montar um pacote para enviar para a aplicação
                     else if(xQueueReceive(q_comm2app, &msgRx, 0) == pdTRUE){ 
                         log_i("Resposta do ed %d recebida. FCT=%d value=%d", msgRx.src, msgRx.function, msgRx.payload.value);
+
+                        dstTask = TCP;
 
                         //verifica o tipo de função
                         switch(msgRx.function){
@@ -179,7 +174,7 @@ void applicationTask(void* pvParameters) {
                         //preciso verificar a validade dos paramatros
                         
                         else if(slot < MAX_SLOTS){
-                            tcpMsgs[slot] = msgRx;
+                            tcpMsgs[slot].msg = msgRx;
                             tcpMsgs[slot].ocupado = true;
                             log_i("Mensagem recebida do TCP para o slot %d", slot);
                         }
@@ -199,12 +194,17 @@ void applicationTask(void* pvParameters) {
                             case FCT_BEACON:
                                 node_init_sync(msgRx.payload.value); //o payload do beacon é o timestamp do router
                                 //monta o frame de resposta do beacon
-                                msgTx.dst = 0; //endereço do router
+                                msgTx.dst = 1; //endereço do router
                                 msgTx.src = loramesh.mydd.devaddr;
                                 msgTx.seqnum = loramesh.mydd.seqnum; //o seqnum da resposta é o mesmo da requisição
                                 msgTx.function = FCT_BEACON;
                                 msgTx.size = 4;
                                 msgTx.payload.value = msgRx.payload.value; //o payload da resposta do beacon é o mesmo da requisição (timestamp do router)
+
+                                #if DISPLAY_ENABLE
+                                    sprintf(display_line3,"Seqnum: %d",loramesh.mydd.seqnum);
+                                    Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
+                                #endif
                                 break;
                             case FCT_WRITTING:
                                 //verifica o paramtro da escrita
@@ -406,35 +406,29 @@ void applicationTask(void* pvParameters) {
                     //         msg.origem, msg.src, msg.dst, msg.function, msg.start, msg.qtdParametros, msg.data.value);
                     // }
 
-                    if(msgTx.origem == TCP){
+                    if(dstTask == COMM){
                         //mensagem vinda do TCP, deve ser enviada para o ED
+                        
+                        if(msgTx.function == FCT_BEACON){
+                            log_i("Mensagem de beacon enviada para a rede LoRa");
+                        }
+                        else
+                            log_i("Mensagem do TCP enviada no slot %d para o ed %d", actualslot, msgTx.dst);
+                        
                         xQueueSend(q_app2comm, &msgTx, 0);
-
-                        log_i("Mensagem do TCP enviada no slot %d para o ed %d", actualslot, msgTx.dst);
+                        
                     }
 
-                    else if(msgTx.origem == LORA){
+                    else if(dstTask == TCP){
                         //mensagem vinda da rede LoRa, deve ser enviada para o TCP
                         //a mensagem já está pronta para ser enviada, basta colocá-la na fila q_app2tcp
                         xQueueSend(q_app2tcp, &msgTx, 0);
 
-                        log_i("Mensagem da rede LoRa enviada para o TCP. Origem: %d, Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
-                            msgTx.origem, msgTx.src, msgTx.dst, msgTx.function, msgTx.start, msgTx.qtdParametros, msgTx.payload.value);
+                        log_i("Mensagem da rede LoRa enviada para o TCP. Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
+                            msgTx.src, msgTx.dst, msgTx.function, msgTx.start, msgTx.qtdParametros, msgTx.payload.value);
                     }
 
-                    else if(msgTx.origem == APP){
-                        //mensagem gerada internamente na aplicação
-                        //verifica o tipo dela
-                        if(msgTx.function == FCT_BEACON && msgTx.dst == BROADCAST_ADDR){
-                            xQueueSend(q_app2comm,&msgTx,0);
-                            log_i("Mensagem de beacon enviada para a rede LoRa");
-                        }
-                        else{
-                            log_i("Mensagem interna ignorada. Origem: %d, Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
-                                msgTx.origem, msgTx.src, msgTx.dst, msgTx.function, msgTx.start, msgTx.qtdParametros, msgTx.payload.value);
 
-                        }
-                    }
                 }
                 else{//end device
 
@@ -469,8 +463,22 @@ void applicationTask(void* pvParameters) {
                 //         xQueueSend(txQueue, &txmsg, 0);
                 // }
                 }
-                send_pct = 0;
-                nextstate = ST_STARTRX;
+                // send_pct = 0;
+                nextstate = ST_WAITTXDONE;
+                break;
+
+            case ST_WAITTXDONE:
+                //espera por uma reposta da comm de que a transmissão terminou antes de iniciiar o modo de escuta
+                msg_t TxStatus;
+                if(xQueueReceive(q_comm2app, &TxStatus, 0) == pdTRUE){
+                    if(TxStatus.function == FCT_TXDONE){
+                        log_i("Transmissão concluída. Voltando para modo de escuta.");
+                        send_pct = 0;
+                        nextstate = ST_STARTRX;
+                    }
+                }
+                vTaskDelay(20 / portTICK_PERIOD_MS); // espera 100ms (ajustar conforme necessário)
+                
                 break;
 
             case ST_STARTRX:
@@ -480,7 +488,7 @@ void applicationTask(void* pvParameters) {
                     log_i("Sent...startReceiving=%d",rx_timeout);
                     loramesh.ClearRadioIRQs();
                     res= loramesh.startReceiving(rx_timeout);
-                    if (res > 0){
+                    if (res != RADIOLIB_ERR_NONE) {
                         log_e("Error startReceiving=%d",res);
                     }
                 }

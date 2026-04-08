@@ -43,12 +43,9 @@ void initcomm(void){
         actualslot = 0;
         nextstate = ST_TXBEACON;
     } else {
-        int res= loramesh.startReceiving(2000);
-        if (res > 0){
-            log_e("Error startReceiving=%d",res);
-        }
-        Serial.println("Dispositivo configurado como End Device");
-        nextstate = ST_RXWAIT;
+        log_i("Dispositivo configurado como End Device");
+        send_pct = 0;
+        nextstate = ST_STARTRX;
     }
 }
 
@@ -86,8 +83,11 @@ void slottimecontrol() {
         lastscantime_ms += currscantime_ms;
         actualslot++;
 
-        if (actualslot > MAX_SLOTS) 
-           actualslot = 0;
+        if (actualslot > MAX_SLOTS){
+            actualslot = 0;
+            if(loramesh.mydd.devtype == DEV_TYPE_ROUTER) 
+                nextstate = ST_TXBEACON;
+        }
    }
 }
 
@@ -95,17 +95,23 @@ void CommTask(void* pvParameters) {
     uint8_t ret=0;
     // TxMessage_t txMsg;
     // RxMessage_t rxMsg;
-    msg_t msg;
+    msg_t msgTx;
+    msg_t msgRx;
 
     while (true) {
 
-        log_i("Comm task iniciada. Slot atual: %d", actualslot);
+        // log_i("Comm task iniciada. Slot atual: %d", actualslot);
     
-       if (xQueueReceive(q_app2comm, &msg, 10 / portTICK_PERIOD_MS) == pdTRUE) {
+       if (xQueueReceive(q_app2comm, &msgTx, 10 / portTICK_PERIOD_MS) == pdTRUE) {
             log_i("sendmsg devtype=%d slot=%d", loramesh.mydd.devtype, actualslot);
             //envia o pacote pela rede
-            if(loramesh.encodeAndSendPacket(&msg))
-                log_i("Mensagem enviada! Dst: %d Function: %d", msg.dst, msg.function); 
+            if(loramesh.encodeAndSendPacket(&msgTx)){
+                //apos finalizar a transmissão, enviar um status para a aplicação indicando que a transmissão foi concluída
+                msg_t txStatus;
+                txStatus.function = FCT_TXDONE;
+                log_i("Mensagem enviada! Dst: %d Function: %d", msgTx.dst, msgTx.function); 
+                xQueueSend(q_comm2app,&txStatus, 0);
+            }
             else
                 log_i("Erro no envio da mensagem");
             
@@ -157,6 +163,8 @@ void CommTask(void* pvParameters) {
             // }
         }
 
+        // uint8_t res = loramesh.receivePacket();
+        // log_i("res: %d", res);
         if (loramesh.receivePacket()) {
             //aqui talvez seria interessante descompactar a mensagem recebida em lastpkt para envia-la pelas tarefas atraves da estrtutura msg
             // msg.src = loramesh.getSrcAdress();
@@ -166,13 +174,20 @@ void CommTask(void* pvParameters) {
             // msg.payload.value = loramesh.getReadingDataAsUint32();
             // msg.size = loramesh.getSizeMsg();
 
-            log_i("Pacote recebido! RSSI: %d dBm", loramesh.packetRssi());
+            log_i("Pacote recebido no slot %d", actualslot);
 
-            loramesh.decodeLoraPacket(&msg);
+            loramesh.decodeLoraPacket(&msgRx);
 
             
             // msg.rssi = loramesh.packetRssi(); //o que e esse rssi?
-            xQueueSend(q_comm2app, &loramesh.msg, 0);
+            if(xQueueSend(q_comm2app, &msgRx, 0) == pdTRUE){
+                log_i("Mensagem da rede LoRa enviada para a aplicação. Src: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
+                    msgRx.src, msgRx.function, msgRx.start, msgRx.qtdParametros, msgRx.payload.value);
+                }
+            else{
+                log_i("Erro ao enviar mensagem para a aplicação");
+            }
+            
         }
 
         vTaskDelay(10 / portTICK_PERIOD_MS);

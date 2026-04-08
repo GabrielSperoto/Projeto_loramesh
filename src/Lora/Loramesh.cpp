@@ -482,13 +482,8 @@ void LoRaClass::clearBuffer(uint8_t *buffer, int size)
 }
 
 uint16_t LoRaClass::getseqnum(uint8_t *packet,uint8_t len){
-    uint16_t aux;
-    uint8_t *pucaux = (uint8_t *) &aux;
     if (len > 4){
-        *pucaux++ = packet[4];
-        *pucaux = packet[3];
-        //log_i ("seq.num=%d",aux);
-        return aux;
+        return ((packet[2] << 8) | packet[3]);
     }
     else
         return 0;
@@ -555,7 +550,7 @@ uint16_t LoRaClass::getLastSeqNum(){
 
 uint16_t LoRaClass::getLastPctSeqNum(){
 
-    return ((lastpkt.payload[3] << 8) | lastpkt.payload[2]);
+    return ((lastpkt.payload[2] << 8) | lastpkt.payload[3]);
 }
 
 uint8_t LoRaClass::getResponseStatus(){
@@ -630,10 +625,9 @@ void LoRaClass::decodeLoraPacket(msg_t *msg){
   uint8_t *rxPacket = lastpkt.payload;
   uint8_t size = lastpkt.packetSize;
 
-  msg->origem = LORA;
   msg->dst = rxPacket[0];
   msg->src = rxPacket[1];
-  msg->seqnum = (rxPacket[3] << 8) | rxPacket[2];
+  msg->seqnum = (rxPacket[2] << 8) | rxPacket[3];
   msg->function = rxPacket[4];
 
   
@@ -725,7 +719,7 @@ uint8_t LoRaClass::encodeAndSendPacket(msg_t* message) {
     // 2. Tratamento do Sequence Number
     // Se for requisição/beacon, incrementa o próprio seqnum. Se for resposta, usa o seqnum do pacote recebido
     uint16_t current_seq;
-    if (message->origem == APP || message->origem == TCP) { 
+    if (mydd.devtype == DEV_TYPE_ROUTER && (message->function == FCT_BEACON)) { 
       current_seq = mydd.seqnum++; 
     } else {
       current_seq = message->seqnum; // Assumindo que é uma resposta
@@ -782,6 +776,7 @@ uint8_t LoRaClass::encodeAndSendPacket(msg_t* message) {
     // 5. Envio físico
     if (sendPacket(buffer, pos)) {
         log_i("Pacote enviado com sucesso, tamanho: %d", pos);
+        log_i("Buffer: %2X %2X %2X %2X %2X ...", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
         // Retorna a rádio para modo de recepção, se necessário
         return pos;
     }
@@ -969,9 +964,8 @@ bool LoRaClass::receivePacket()
 {
 
     // formato do pacote recebido [src, dst, fct, seq number, size, payload (data), crc]
-    log_i("Checking for received packets...");
+    // log_i("Checking for received packets...");
     bool retcrc=0;
-    int packetSize = 0;
     uint8_t ret=0;
     uint8_t srcadress;
     uint8_t dstadress;
@@ -991,20 +985,21 @@ bool LoRaClass::receivePacket()
       RADIOLIB_ASSERT(state);
 
 #else // V2
-    packetSize = loramesh.parsePacket(0);
-    if (packetSize) {
+    lastpkt.packetSize = loramesh.parsePacket(0);
+    if (lastpkt.packetSize) {
         while (loramesh.available() && len < BUFFER_SIZE - 1) {
             lastpkt.payload[len++] = (char)loramesh.read(); // Lê o pacote byte a byte
         }
 #endif
 
         // verifica o srcaddress e dstaddress do pacote
-        srcadress = lastpkt.payload[0];
-        dstadress = lastpkt.payload[1];
-        fct = lastpkt.payload[2];
+        dstadress = lastpkt.payload[0];
+        srcadress = lastpkt.payload[1];
+        fct = lastpkt.payload[4];
         //big endian
-        seqnum = getseqnum((uint8_t *)lastpkt.payload,packetSize);
-        mydd.seqnum = seqnum; //atualiza o seqnum do dispositivo com o valor do pacote recebido, para que ele possa usar esse valor para enviar a resposta
+        seqnum = getseqnum((uint8_t *)lastpkt.payload,lastpkt.packetSize);
+        if(mydd.devtype == DEV_TYPE_ENDDEV)
+          mydd.seqnum = seqnum; //atualiza o seqnum do dispositivo com o valor do pacote recebido, para que ele possa usar esse valor para enviar a resposta
 
         //verifica se o srcaddress e dstaddress do pacote sao validos
         // ret = getaddress((uint8_t *)lastpkt.payload,packetSize);
@@ -1014,18 +1009,20 @@ bool LoRaClass::receivePacket()
           ret = 0;
 
         // ret = getaddress((uint8_t *)buffer,packetSize);
-        log_i("Rx Pktsize: %d",packetSize);
+        // log_i("Rx Pktsize: %d",packetSize);
         
         //verifica se o pacote recebido nao eh o mesmo que acabou de ser enviado
         if ((ret) && ((srcadress != mydd.devaddr))) {
             // lastpkt.fct       = getfunction((uint8_t *)lastpkt.payload,packetSize);
             // lastpkt.seqnum    = getseqnum((uint8_t *)lastpkt.payload,packetSize);
             // lastpkt.timestamp = gettimestamp((uint8_t *)lastpkt.payload,packetSize);
-            retcrc = checkcrc((uint8_t *)lastpkt.payload,packetSize);
+            retcrc = checkcrc((uint8_t *)lastpkt.payload,lastpkt.packetSize);
 
-            log_i("Rx[%d] = %d %d %d %d",lastpkt.packetSize, srcadress, dstadress,fct,seqnum);
+            log_i("Rx[%d] = %2X %2X %2X %2X %2X",lastpkt.packetSize, dstadress, srcadress,lastpkt.payload[2],lastpkt.payload[3],fct);
+            // log_i("SeqNum: %d",seqnum);
 
             if ((retcrc == 1) && ((dstadress == mydd.devaddr) || (dstadress == BROADCAST_ADDR))) {
+              log_i("Packet received with valid CRC, destined for this device or broadcast. Processing...");
                 return 1;
             }
             else

@@ -56,8 +56,8 @@ typedef struct __attribute__((packed)) {
 typedef enum {
     TCP,
     APP,
-    LORA
-} origem_t;
+    COMM
+} task_t;
 
 typedef union {
     uint8_t bytes[4];
@@ -65,7 +65,6 @@ typedef union {
 } payload_t;
 
 typedef struct{
-    origem_t origem; //indica a origem da mensagem (TCP, APP ou LORA)
     uint8_t dst;
     uint8_t src;
     uint16_t seqnum;
@@ -74,8 +73,12 @@ typedef struct{
     uint8_t qtdParametros; //start e qtdParametros fazem parte do pacote de requisição 
     uint8_t size;
     payload_t payload; //valor usado na escrita ou leitura
-    bool ocupado; //indica se o slot está ocupado ou não
 } msg_t;
+
+typedef struct {
+    msg_t msg;
+    uint8_t ocupado; //flag para indicar se a estrutura está ocupada ou não
+} tcpMsgs_t;
 
 typedef struct  {
     uint16_t devserialnumber;
@@ -96,7 +99,8 @@ typedef enum {
    FCT_JOIN, 
    FCT_DESCRIPTION,
    FCT_READING,
-   FCT_WRITTING
+   FCT_WRITTING,
+   FCT_TXDONE
 } functioncode;
 
 typedef enum  {
@@ -105,6 +109,7 @@ typedef enum  {
     ST_RXWAIT,
     ST_STARTTX,
     ST_TXDATA,
+    ST_WAITTXDONE,
     ST_STANDBY
 }statemac;
 
