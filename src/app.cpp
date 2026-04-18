@@ -24,6 +24,7 @@ void setindpolls();
 void slottimecontrol(void);
 void node_init_sync(uint32_t new_FR);
 void displayline(uint8_t line, char *pucMsg, ...);
+void ledblink(uint8_t ledpin);
 
 extern float TensaoDeSaida;
 extern uint16_t valorPot;
@@ -46,10 +47,31 @@ void applicationTask(void* pvParameters) {
     msg_t msgTx;
     msg_t msgRx;
 
+    // ledblink(PinLed);
+
     for(int i=0;i<MAX_SLOTS;i++){
         memset(&tcpMsgs[i], 0, sizeof(tcpMsgs_t)); // Limpa a estrutura de cada slot
         tcpMsgs[i].ocupado = false; // inicializa todos os slots como livres
     }
+
+    //tcpMsgs e preenchida manualmente para fins de teste 
+
+    // tcpMsgs[3].msg.dst = 4;
+    // tcpMsgs[3].msg.src = 1;
+    // tcpMsgs[3].msg.function = FCT_READING;
+    // tcpMsgs[3].msg.start = LEDP;
+    // tcpMsgs[3].msg.qtdParametros = 1;
+    // tcpMsgs[3].msg.payload.value = 0; //valor para acender o led
+    // tcpMsgs[3].ocupado = true; //marca o slot como ocupado
+
+    tcpMsgs[2].msg.dst = 2;
+    tcpMsgs[2].msg.src = 0;
+    tcpMsgs[2].msg.function = FCT_WRITTING;
+    tcpMsgs[2].msg.start = LEDP;
+    tcpMsgs[2].msg.qtdParametros = 1;
+    tcpMsgs[2].msg.payload.value = 1; //valor para apagar o led
+    tcpMsgs[2].ocupado = true; //marca o slot como ocupado
+
 
     while (true) {
         slottimecontrol();
@@ -66,6 +88,8 @@ void applicationTask(void* pvParameters) {
                     // txmsg.function = FCT_BEACON;
                     // txmsg.size = 0;
                     // xQueueSend(txQueue, &txmsg, 0);
+
+                    tcpMsgs[2].ocupado = true; // marca o slot como ocupado
 
                     lastActivityMillis = millis();
 
@@ -99,13 +123,7 @@ void applicationTask(void* pvParameters) {
                     //verifica se há msg para ser enviada
                     if(tcpMsgs[actualslot].ocupado){
                         //monta o pacote
-                        // msg.origem = tcpMsgs[actualslot].origem;
-                        // msg.src = tcpMsgs[actualslot].src;
-                        // msg.dst = tcpMsgs[actualslot].dst;
-                        // msg.function = tcpMsgs[actualslot].function;
-                        // msg.start = tcpMsgs[actualslot].start;
-                        // msg.qtdParametros = tcpMsgs[actualslot].qtdParametros;
-                        // msg.data = tcpMsgs[actualslot].data;
+                        
 
                         msgTx = tcpMsgs[actualslot].msg;
                         dstTask = COMM;
@@ -114,14 +132,17 @@ void applicationTask(void* pvParameters) {
                         log_i("Mensagem detalhes - Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
                             msgTx.src, msgTx.dst, msgTx.function, msgTx.start, msgTx.qtdParametros, msgTx.payload.value);
 
+                        // tcpMsgs[actualslot].ocupado = false; // marca o slot como livre
+                        tcpMsgs[actualslot].msg.payload.value = !tcpMsgs[actualslot].msg.payload.value; // inverte o valor do payload para teste (ex: se for 1, vira 0 e vice-versa)
                         tcpMsgs[actualslot].ocupado = false; // marca o slot como livre
                         nextstate = ST_TXDATA;
+                        continue;
                     }
 
                    
                     //verifica se há mensagens vindas da rede LoRa
                     //seria necessario aqui tambem montar um pacote para enviar para a aplicação
-                    else if(xQueueReceive(q_comm2app, &msgRx, 0) == pdTRUE){ 
+                    if(xQueueReceive(q_comm2app, &msgRx, 0) == pdTRUE){ 
                         log_i("Resposta do ed %d recebida. FCT=%d value=%d", msgRx.src, msgRx.function, msgRx.payload.value);
 
                         dstTask = TCP;
@@ -161,7 +182,7 @@ void applicationTask(void* pvParameters) {
                     }
 
                     //verifica se há mensagens recebidas para o slot atual. Se sim, guarda-as em um array
-                    else if(xQueueReceive(q_tcp2app,&msgRx,0) == pdTRUE){
+                    if(xQueueReceive(q_tcp2app,&msgRx,0) == pdTRUE){
                         uint8_t slot = msgRx.dst;
 
                         //verifica se o endereço da mensagem é valido
@@ -220,7 +241,7 @@ void applicationTask(void* pvParameters) {
                                     }
 
                                     //retorna uma resposta ao router
-                                    msgTx.dst = 0; //endereço do router
+                                    msgTx.dst = 1; //endereço do router
                                     msgTx.src = loramesh.mydd.devaddr;
                                     msgTx.seqnum = loramesh.mydd.seqnum; //o seqnum da resposta é o mesmo da requisição   
                                     
@@ -261,7 +282,7 @@ void applicationTask(void* pvParameters) {
                                     //aqui eu retorno o status do LED
                                     log_i("Status do LED lido: %s", digitalRead(PinLed) == HIGH ? "ON" : "OFF");
                                     msgTx.src = loramesh.mydd.devaddr;
-                                    msgTx.dst = 0; //endereço do router
+                                    msgTx.dst = 1; //endereço do router
                                     msgTx.seqnum = loramesh.mydd.seqnum; //o seqnum da resposta é o mesmo da requisição
                                     msgTx.function = FCT_READING;
                                     msgTx.size = 1;
@@ -276,113 +297,11 @@ void applicationTask(void* pvParameters) {
                         }
                                 
                         //envia a resposta para o router
-                        nextstate = ST_TXDATA;  
+                        nextstate = ST_TXDATA; 
+                        continue; //pula o delay para enviar a resposta imediatamente 
                     }
                         
                 }
-                //manipula os pacotes recebidos pelo router e pelo ed
-                // if (xQueueReceive(rxQueue, &rxMsg, 0) == pdTRUE) {
-
-                //     log_i("App recebeu pacote no slot %d de %d func=%d size=%d RSSI=%d ",
-                //         actualslot, rxMsg.src, rxMsg.function, rxMsg.size, rxMsg.rssi);
-
-                //     // guarda a mensagem recebida no buffer do slot correspondente
-                    
-                //     if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-    
-                //         log_i("rxMsg.payload[0]: %d, rxMsg.payload[1]: %d", rxMsg.payload[0], rxMsg.payload[1]);
-
-                //         //verifica a função da mensagem recebida
-                //         switch (rxMsg.function){
-                //             case FCT_SYNC_SUCESS:{
-                //                 setindpolls();
-                //                 // log_i("Rx.seqnumb: %d",loramesh.lastpkt.seqnum);
-                //                 break;
-                //             }
-                //             case FCT_WRITTING: {
-                //                 uint8_t writtingCode = loramesh.getResponseStatus();
-                //                 txmsg.value = writtingCode;
-                //                 if (writtingCode == 1){
-                //                     log_i("Escrita realizada com sucesso no no %d",rxMsg.src);
-                //                 }
-                //                 else{
-                //                     log_i("Falha na escrita no no %d",rxMsg.src);
-                //                 }
-                //                 nextstate = ST_TXDATA;
-                //                 break;
-                //             }
-                //             case FCT_READING: {
-                //                 // a divisao por 100 é para converter o valor inteiro de volta para float
-                //                 float value = loramesh.getReadingDataAsUint32();
-                //                 txmsg.value = value;
-                //                 if(value > 0){
-                //                     log_i("Valor lido: %.2f",value);
-                //                 }
-                //                 nextstate = ST_TXDATA;
-                //                 break;
-                //             }
-                //             case FCT_DESCRIPTION: {
-                //                 //mensagem de descrição
-                //                 break;
-                //             }
-                //         }
-                //     }
-
-                //     else{ //end device
-                //         //verifica o destino da mensagem
-                //         switch (rxMsg.function){
-                //             case FCT_BEACON:{
-                //                 uint8_t* rxpacket = rxMsg.payload;
-                //                 uint8_t len =rxMsg.size;
-                //                 uint32_t timestamp = loramesh.gettimestamp(rxpacket,len);
-                //                 loramesh.mydd.seqnum = loramesh.getLastPctSeqNum();
-                //                 node_init_sync(timestamp);
-    
-                //                 #if DISPLAY_ENABLE  
-                //                   char display_line[20];
-                //                   sprintf(display_line,"Seq. number: %d", loramesh.mydd.seqnum);
-                //                   displayline(3,display_line);
-                //                 #endif
-    
-                //                 //log_i("Rx.seqnum: %d time=%d slot=%d", loramesh.lastpkt.seqnum,timestamp,actualslot);
-                //                 nextstate = ST_STARTRX;
-    
-                //                 break;
-                //             }
-                //             case FCT_WRITTING:{
-                //                 //mensagem de escrita
-                //                 if (loramesh.getWrittingCode() == 1){
-                //                     log_i("Led Aceso!");
-                //                     digitalWrite(PinLed, HIGH);
-                //                 }
-                //                 else{
-                //                     log_i("Led apagado!");
-                //                     digitalWrite(PinLed, LOW);
-
-                //                 }
-                //                 nextstate = ST_TXDATA;
-                //                 break;
-                //             }
-                //             case FCT_READING:{
-                //                 // log_i("Pacote de leitura recebido! ");
-                //                 uint16_t seqnumber = loramesh.lastpkt.seqnum;
-                //                 log_i("Rx.seqnumber: %d",seqnumber);
-                //                 #if DISPLAY_ENABLE  
-                //                   char display_line[20];
-                //                   sprintf(display_line,"Seq. number: %d", seqnumber);
-                //                   displayline(3,display_line);
-                //                 #endif
-                //                 nextstate = ST_TXDATA;
-                //                 //mensagem de leitura
-                //                 break;
-                //             }
-                //             case FCT_DESCRIPTION: {
-                //                 //mensagem de descrição
-                //                 break;
-                //             }
-                //         }
-                //     }
-                // }
 
                 break;
 
@@ -390,30 +309,15 @@ void applicationTask(void* pvParameters) {
                 lastActivityMillis = millis();
                 //achq que aqui eu deveria montar o frame especifico e colocar na fila...
                 if (loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-                    // txmsg.src = loramesh.mydd.devaddr;
-                    // txmsg.dst = BROADCAST_ADDR; //DST seria o enderco do ed que enviou a resposta ?
-                    // txmsg.function = rxMsg.function;
-                    // txmsg.start = 1;
-                    // txmsg.qtdParametros = 1;
-                    // xQueueSend(txQueue, &txmsg, 0);
-                    
-                    // else{
-                    //     //mensagem vinda da rede LoRa, deve ser enviada para o TCP
-                    //     //a mensagem já está pronta para ser enviada, basta colocá-la na fila q_app2tcp
-                    //     xQueueSend(q_app2tcp, &msg, 0);
-
-                    //     log_i("Mensagem da rede LoRa enviada para o TCP. Origem: %d, Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
-                    //         msg.origem, msg.src, msg.dst, msg.function, msg.start, msg.qtdParametros, msg.data.value);
-                    // }
 
                     if(dstTask == COMM){
                         //mensagem vinda do TCP, deve ser enviada para o ED
                         
-                        if(msgTx.function == FCT_BEACON){
-                            log_i("Mensagem de beacon enviada para a rede LoRa");
-                        }
-                        else
-                            log_i("Mensagem do TCP enviada no slot %d para o ed %d", actualslot, msgTx.dst);
+                        // if(msgTx.function == FCT_BEACON){
+                        //     log_i("Mensagem de beacon enviada para a rede LoRa");
+                        // }
+                        // else
+                        //     log_i("Mensagem do TCP enviada no slot %d para o ed %d", actualslot, msgTx.dst);
                         
                         xQueueSend(q_app2comm, &msgTx, 0);
                         
@@ -424,8 +328,8 @@ void applicationTask(void* pvParameters) {
                         //a mensagem já está pronta para ser enviada, basta colocá-la na fila q_app2tcp
                         xQueueSend(q_app2tcp, &msgTx, 0);
 
-                        log_i("Mensagem da rede LoRa enviada para o TCP. Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
-                            msgTx.src, msgTx.dst, msgTx.function, msgTx.start, msgTx.qtdParametros, msgTx.payload.value);
+                        // log_i("Mensagem da rede LoRa enviada para o TCP. Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
+                        //     msgTx.src, msgTx.dst, msgTx.function, msgTx.start, msgTx.qtdParametros, msgTx.payload.value);
                     }
 
 
@@ -510,7 +414,7 @@ void applicationTask(void* pvParameters) {
 
         lastslot = actualslot;
 
-        vTaskDelay(20 / portTICK_PERIOD_MS);
+        vTaskDelay(2 / portTICK_PERIOD_MS);
     }
 }
 

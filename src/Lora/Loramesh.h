@@ -178,7 +178,7 @@ public:
   uint16_t getLastSeqNum(void);
   uint16_t getLastPctSeqNum(void);
   uint8_t getResponseStatus(void);
-  uint32_t getReadingDataAsUint32(void); // obtem o valor de leitura
+  uint32_t getPayloadValue(uint8_t *packet, uint8_t len); // obtem o valor de leitura
   uint8_t getWrittingCode(void);
 
   uint8_t getSrcAdress();

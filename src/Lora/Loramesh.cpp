@@ -560,23 +560,21 @@ uint8_t LoRaClass::getResponseStatus(){
   return -1;
 }
 
-uint32_t LoRaClass::getReadingDataAsUint32(){
-  uint8_t* rxPacket = lastpkt.payload;
-  uint8_t size = lastpkt.packetSize;
-  uint32_t value;
+uint32_t LoRaClass::getPayloadValue(uint8_t *packet,uint8_t len){
+  
 
-  if(size > 5 && rxPacket[2] == FCT_READING){
-    uint8_t valueSize = rxPacket[5];
-    uint8_t* buffer = &rxPacket[6];
+  if(len > 0){
+    uint32_t value;
+    uint8_t* buffer = &packet[6];
 
     uint8_t* pucaux = (uint8_t*) &value;
 
     // log_i("buffer size: %2x buffer[6-9]:  %2x %2x %2x %2x",valueSize,buffer[0],buffer[1],buffer[2],buffer[3]);
 
-    pucaux[0] = buffer[3]; // LSB
-    pucaux[1] = buffer[2];
-    pucaux[2] = buffer [1];
-    pucaux[3] = buffer[0]; // MSB
+    for (int i = 0; i < len; i++) {
+        pucaux[i] = buffer[len - 1 - i]; // LSB first
+    }
+
 
     return value;
   }
@@ -587,7 +585,7 @@ uint32_t LoRaClass::getReadingDataAsUint32(){
 uint8_t LoRaClass::getWrittingCode(){
   uint8_t* rxPacket = lastpkt.payload;
   uint8_t size = lastpkt.packetSize;
-  if(size > 5 && rxPacket[2] == FCT_WRITTING) return rxPacket[6];
+  if(size > 5 && rxPacket[4] == FCT_WRITTING) return rxPacket[8];
   return -1;
 }
 
@@ -638,35 +636,37 @@ void LoRaClass::decodeLoraPacket(msg_t *msg){
   if(mydd.devtype == DEV_TYPE_ROUTER){
     //pacote de respsota não possui nem o campo start nem o qtd Parametros
     msg->size = rxPacket[5];
-    switch (msg->function)
-        {
-            case FCT_BEACON:
-                //aqui o router recebe o beacon dos end devices, entao ele pode atualizar a tabela de rotas e enviar mensagens para os end devices
-                //log_i("Received BEACON from device %d", getSrcAdress());
-                // msg.size = rxPacket[5];
-                msg->payload.value = gettimestamp(rxPacket,size);
-                break;
+    // log_i("size: %d",msg->size);
+    msg->payload.value = getPayloadValue(rxPacket,msg->size);
+    // switch (msg->function)
+    //     {
+    //         case FCT_BEACON:
+    //             //aqui o router recebe o beacon dos end devices, entao ele pode atualizar a tabela de rotas e enviar mensagens para os end devices
+    //             //log_i("Received BEACON from device %d", getSrcAdress());
+    //             // msg.size = rxPacket[5];
+    //             msg->payload.value = getPayloadValue(rxPacket,msg->size);
+    //             break;
 
-            case FCT_READING:
-                //aqui o router recebe a requisição de leitura do end device, entao ele deve enviar a requisição para o dispositivo destino
-                //log_i("Received READING REQUEST from device %d", getSrcAdress());
-                // msg.size = rxPacket[5];
-                msg->payload.value = getReadingDataAsUint32();
-                break;
+    //         case FCT_READING:
+    //             //aqui o router recebe a requisição de leitura do end device, entao ele deve enviar a requisição para o dispositivo destino
+    //             //log_i("Received READING REQUEST from device %d", getSrcAdress());
+    //             // msg.size = rxPacket[5];
+    //             msg->payload.value = getPayloadValue(rxPacket,msg->size);
+    //             break;
 
-            case FCT_WRITTING:
-                //aqui o router recebe a requisição de escrita do end device, entao ele deve enviar a requisição para o dispositivo destino
-                //log_i("Received WRITTING REQUEST from device %d", getSrcAdress());
-                // msg.size = rxPacket[5];
-                msg->payload.value = getWrittingCode();
-                break;
-            case FCT_DESCRIPTION:
-                //aqui o router recebe a requisição de descrição do end device, entao ele deve enviar a resposta com a descrição do dispositivo
-                //log_i("Received DESCRIPTION REQUEST from device %d", getSrcAdress());
-                break;
-            default:
-                log_w("Funcao nao suportada: %d", msg->function);
-        }
+    //         case FCT_WRITTING:
+    //             //aqui o router recebe a requisição de escrita do end device, entao ele deve enviar a requisição para o dispositivo destino
+    //             //log_i("Received WRITTING REQUEST from device %d", getSrcAdress());
+    //             // msg.size = rxPacket[5];
+    //             msg->payload.value = getPayloadValue(rxPacket,msg->size);
+    //             break;
+    //         case FCT_DESCRIPTION:
+    //             //aqui o router recebe a requisição de descrição do end device, entao ele deve enviar a resposta com a descrição do dispositivo
+    //             //log_i("Received DESCRIPTION REQUEST from device %d", getSrcAdress());
+    //             break;
+    //         default:
+    //             log_w("Funcao nao suportada: %d", msg->function);
+    //     }
     
   }
   else{ //end device 
@@ -676,7 +676,7 @@ void LoRaClass::decodeLoraPacket(msg_t *msg){
                 //aqui o end device recebe o beacon do router, entao ele pode atualizar a tabela de rotas e enviar mensagens para o router
                 //log_i("Received BEACON from device %d", getSrcAdress());
                 // msg.size = 4;
-                msg->payload.value = gettimestamp(rxPacket,size);
+                msg->payload.value = getPayloadValue(rxPacket,msg->size);
                 break;
 
             case FCT_READING:

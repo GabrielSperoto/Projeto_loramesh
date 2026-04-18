@@ -101,78 +101,10 @@ void CommTask(void* pvParameters) {
     while (true) {
 
         // log_i("Comm task iniciada. Slot atual: %d", actualslot);
-    
-       if (xQueueReceive(q_app2comm, &msgTx, 10 / portTICK_PERIOD_MS) == pdTRUE) {
-            log_i("sendmsg devtype=%d slot=%d", loramesh.mydd.devtype, actualslot);
-            //envia o pacote pela rede
-            if(loramesh.encodeAndSendPacket(&msgTx)){
-                //apos finalizar a transmissão, enviar um status para a aplicação indicando que a transmissão foi concluída
-                msg_t txStatus;
-                txStatus.function = FCT_TXDONE;
-                log_i("Mensagem enviada! Dst: %d Function: %d", msgTx.dst, msgTx.function); 
-                xQueueSend(q_comm2app,&txStatus, 0);
-            }
-            else
-                log_i("Erro no envio da mensagem");
-            
-            // switch (msg.function) {
-            //     case FCT_BEACON:
-            //         log_i("Seq.num: %d",loramesh.mydd.seqnum);
-            //         #if DISPLAY_ENABLE
-            //             sprintf(display_line3,"Seq. number: %d",loramesh.mydd.seqnum);
-            //             Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
-            //         #endif
-            //         loramesh.sendBeacon(millis());
-            //         break;
 
-            //     case FCT_READING:
-            //         if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-            //             if (loramesh.sendReadingReq(msg.dst, msg.start,msg.qtdParametros))
-            //                 log_i("msg.dst: %d msg.start: %d msg.qtdParametros: %d",msg.dst,msg.start,msg.qtdParametros);
-            //             else
-            //                 log_i("Erro no envio da requisição de leitura");
-            //         }
-                    
-            //         else{ //end device
-            //             //ed envia a resposta para o router
-            //             //payload é um buffer para guardar o valor lido
-            //             if(loramesh.sendReadingRes(msg.dst, msg.size, msg.payload.bytes))
-            //                 log_i("Resposta enviada! msg.dst: %d msg.size: %d msg.data.bytes: %d",msg.dst,msg.size,msg.payload.bytes); 
-            //             else                      
-            //                 log_i("Erro no envio da resposta de leitura");
-            //         }
-            //         break;
-
-            //     case FCT_WRITTING:
-            //         if(loramesh.mydd.devtype == DEV_TYPE_ROUTER){
-            //             if (loramesh.sendWrittingReq(msg.dst, msg.start,msg.qtdParametros,msg.payload.value))
-            //                 log_i("msg.dst: %d msg.start: %d msg.qtdParametros: %d msg.value: %d",msg.dst,msg.start,msg.qtdParametros,msg.payload.value);
-            //             else
-            //                 log_i("Erro no envio da requisição de escrita");
-            //         } 
-
-            //         else{ //end device
-            //             if (loramesh.sendWrittingRes(msg.dst, msg.payload.value)) 
-            //                 log_i("msg.dst: %d status: %d",msg.dst, (msg.payload.value == 1) ? "Sucesso" : "Falha"); 
-            //             else
-            //                 log_i("Erro no envio da resposta de escrita");
-            //         }
-            //         break;
-            //     default:
-            //         log_w("Funcao nao suportada: %d", txMsg.function);
-            // }
-        }
-
-        // uint8_t res = loramesh.receivePacket();
-        // log_i("res: %d", res);
+        //verifica se há mensagem do radio
         if (loramesh.receivePacket()) {
             //aqui talvez seria interessante descompactar a mensagem recebida em lastpkt para envia-la pelas tarefas atraves da estrtutura msg
-            // msg.src = loramesh.getSrcAdress();
-            // msg.function = loramesh.getFunctionCode();
-            // msg.start = loramesh.getStart();
-            // msg.qtdParametros = loramesh.getQtdParametros();
-            // msg.payload.value = loramesh.getReadingDataAsUint32();
-            // msg.size = loramesh.getSizeMsg();
 
             log_i("Pacote recebido no slot %d", actualslot);
 
@@ -190,7 +122,25 @@ void CommTask(void* pvParameters) {
             
         }
 
-        vTaskDelay(10 / portTICK_PERIOD_MS);
+        //verifica se há mensagens da aplicação
+    
+       if (xQueueReceive(q_app2comm, &msgTx, 10 / portTICK_PERIOD_MS) == pdTRUE) {
+            log_i("sendmsg devtype=%d slot=%d", loramesh.mydd.devtype, actualslot);
+            //envia o pacote pela rede
+            if(loramesh.encodeAndSendPacket(&msgTx)){
+                //apos finalizar a transmissão, enviar um status para a aplicação indicando que a transmissão foi concluída
+                msg_t txStatus;
+                txStatus.function = FCT_TXDONE;
+                log_i("Mensagem enviada! Dst: %d Function: %d Value: %d", msgTx.dst, msgTx.function, msgTx.payload.value); 
+                xQueueSend(q_comm2app,&txStatus, 0);
+            }
+            else
+                log_i("Erro no envio da mensagem");
+            
+        }
+        
+
+        vTaskDelay(2 / portTICK_PERIOD_MS);
     }
 }
 
