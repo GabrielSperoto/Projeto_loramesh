@@ -51,6 +51,7 @@ void initcomm(void){
 
 void node_init_sync(uint32_t new_FR) {
     current_FR = new_FR;
+    // log_i("Node initialized with new FR: %lu", (unsigned long)new_FR);
 
     if (previous_FR != 0) {
         drift = (current_FR - previous_FR) - SYNC_INTERVAL_MS;

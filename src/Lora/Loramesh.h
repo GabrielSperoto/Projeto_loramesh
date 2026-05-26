@@ -39,6 +39,8 @@
 #define RF_PADAC_20DBM_ON                           0x07
 #define RF_PADAC_20DBM_OFF                          0x04  // Default
 
+#define POLYNOMIAL_CRC 0x1021                       // Define o polinômio para o cálculo do CRC-16-CCITT
+
 
 void LoraSendFrame(String data,size_t len);
 uint8_t LoraReceiveFrame(char *pframe);
@@ -170,7 +172,7 @@ public:
   void clearDioActions(void);
   void onReceive(void);
   uint8_t getrouteaddr(void);
-  uint8_t checkcrc (uint8_t *packet, uint8_t len);
+  uint16_t calculate_crc (uint8_t *packet, uint8_t len);
   uint8_t getaddress(uint8_t *packet,uint8_t len);
   uint32_t gettimestamp(uint8_t *packet,uint8_t len);
   uint8_t getfunction(uint8_t *packet,uint8_t len);

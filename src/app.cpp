@@ -56,40 +56,48 @@ void applicationTask(void* pvParameters) {
 
     //tcpMsgs e preenchida manualmente para fins de teste 
 
-    // tcpMsgs[3].msg.dst = 4;
-    // tcpMsgs[3].msg.src = 1;
-    // tcpMsgs[3].msg.function = FCT_READING;
-    // tcpMsgs[3].msg.start = LEDP;
-    // tcpMsgs[3].msg.qtdParametros = 1;
-    // tcpMsgs[3].msg.payload.value = 0; //valor para acender o led
-    // tcpMsgs[3].ocupado = true; //marca o slot como ocupado
+    tcpMsgs[3].msg.dst = 3;
+    tcpMsgs[3].msg.src = 1;
+    tcpMsgs[3].msg.function = FCT_READING;
+    tcpMsgs[3].msg.start = POT;
+    tcpMsgs[3].msg.qtdParametros = 1;
+    tcpMsgs[3].msg.payload.value = 0; //valor para acender o led
+    tcpMsgs[3].ocupado = true; //marca o slot como ocupado
 
     tcpMsgs[2].msg.dst = 2;
-    tcpMsgs[2].msg.src = 0;
+    tcpMsgs[2].msg.src = 1;
     tcpMsgs[2].msg.function = FCT_WRITTING;
     tcpMsgs[2].msg.start = LEDP;
     tcpMsgs[2].msg.qtdParametros = 1;
     tcpMsgs[2].msg.payload.value = 1; //valor para apagar o led
     tcpMsgs[2].ocupado = true; //marca o slot como ocupado
 
+    tcpMsgs[4].msg.dst = 4;
+    tcpMsgs[4].msg.src = 1;
+    tcpMsgs[4].msg.function = FCT_READING;
+    tcpMsgs[4].msg.start = POT;
+    tcpMsgs[4].msg.qtdParametros = 1;
+    tcpMsgs[4].msg.payload.value = 0; //valor para acender o led
+    tcpMsgs[4].ocupado = true; //marca o slot como ocupado
 
     while (true) {
         slottimecontrol();
-        // log_i("Aplication task iniciaida. Slot atual: %d lastslot=%d", actualslot, lastslot);
-        
-        // log_i("app : slot=%d ns=%d ", actualslot, nextstate);
+
+        // if(actualslot == 0){
+        //     //pisca o led somente para conferir a sincronização dos nos
+        //     ledblink(PinLed);
+        // }
+
 
         lastActivityMillis = millis();
 
         switch (nextstate) {
             case ST_TXBEACON:
                 if ((loramesh.mydd.devtype == DEV_TYPE_ROUTER) && (actualslot == 0)) {
-                    // txmsg.dst = BROADCAST_ADDR;
-                    // txmsg.function = FCT_BEACON;
-                    // txmsg.size = 0;
-                    // xQueueSend(txQueue, &txmsg, 0);
 
                     tcpMsgs[2].ocupado = true; // marca o slot como ocupado
+                    tcpMsgs[3].ocupado = true; // marca o slot como ocupado
+                    tcpMsgs[4].ocupado = true; // marca o slot como ocupado
 
                     lastActivityMillis = millis();
 
@@ -109,6 +117,7 @@ void applicationTask(void* pvParameters) {
                         Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
                     #endif
                     nextstate = ST_TXDATA;
+                    continue;
 
                     
                     // nextstate = ST_STANDBY; 
