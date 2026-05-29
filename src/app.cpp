@@ -179,7 +179,7 @@ void applicationTask(void* pvParameters) {
 
                             case FCT_READING:
                                 // a divisao por 100 é para converter o valor inteiro de volta para float
-                                float value = msgRx.payload.value / 100.0;
+                                float value = msgRx.payload.value ;
                                 log_i("Valor lido: %.2f",value);
 
                                 #if DISPLAY_ENABLE
@@ -264,7 +264,7 @@ void applicationTask(void* pvParameters) {
                                     //como não há como escrever em um potenciometro, retorna um codigo de erro (0)
                                     log_e("Tentativa de escrita em um parâmetro de leitura (POT)");
                                     msgTx.src = loramesh.mydd.devaddr;
-                                    msgTx.dst = 0; //endereço do router
+                                    msgTx.dst = 1; //endereço do router
                                     msgTx.seqnum = loramesh.mydd.seqnum; //o seqnum da resposta é o mesmo da requisição
                                     msgTx.function = FCT_WRITTING;
                                     msgTx.size = 1;
@@ -280,7 +280,7 @@ void applicationTask(void* pvParameters) {
                                     log_i("Valor do potenciometro lido: %d", valorPot);
 
                                     msgTx.src = loramesh.mydd.devaddr;
-                                    msgTx.dst = 0; //endereço do router
+                                    msgTx.dst = 1; //endereço do router
                                     msgTx.seqnum = loramesh.mydd.seqnum; //o seqnum da resposta é o mesmo da requisição
                                     msgTx.function = FCT_READING;
                                     msgTx.size = sizeof(valorPot);
