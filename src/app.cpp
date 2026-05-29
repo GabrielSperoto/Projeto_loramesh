@@ -179,7 +179,7 @@ void applicationTask(void* pvParameters) {
 
                             case FCT_READING:
                                 // a divisao por 100 é para converter o valor inteiro de volta para float
-                                float value = msgRx.payload.value ;
+                                float value = msgRx.payload.value*100 ;
                                 log_i("Valor lido: %.2f",value);
 
                                 #if DISPLAY_ENABLE
@@ -278,13 +278,13 @@ void applicationTask(void* pvParameters) {
                                     //obtem o valor do potenciometro e retorna na resposta
                                     uint16_t valorPot = analogRead(PinPot);
                                     log_i("Valor do potenciometro lido: %d", valorPot);
-
+                                    uint32_t TensaoDeSaida = (((float)valorPot / 4095.0) * 3.3)/100;
                                     msgTx.src = loramesh.mydd.devaddr;
                                     msgTx.dst = 1; //endereço do router
                                     msgTx.seqnum = loramesh.mydd.seqnum; //o seqnum da resposta é o mesmo da requisição
                                     msgTx.function = FCT_READING;
-                                    msgTx.size = sizeof(valorPot);
-                                    msgTx.payload.value = valorPot;
+                                    msgTx.size = sizeof(TensaoDeSaida);
+                                    msgTx.payload.value = TensaoDeSaida;
                                     
                                 }
                                 else if(msgRx.start == LEDP){
