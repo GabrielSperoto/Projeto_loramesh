@@ -137,9 +137,9 @@ void applicationTask(void* pvParameters) {
                         msgTx = tcpMsgs[actualslot].msg;
                         dstTask = COMM;
                     
-                        log_i("Mensagem pronta para envio no slot %d", actualslot);
-                        log_i("Mensagem detalhes - Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
-                            msgTx.src, msgTx.dst, msgTx.function, msgTx.start, msgTx.qtdParametros, msgTx.payload.value);
+                        // log_i("Mensagem pronta para envio no slot %d", actualslot);
+                        // log_i("Mensagem detalhes - Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
+                        //     msgTx.src, msgTx.dst, msgTx.function, msgTx.start, msgTx.qtdParametros, msgTx.payload.value);
 
                         // tcpMsgs[actualslot].ocupado = false; // marca o slot como livre
                         tcpMsgs[actualslot].msg.payload.value = !tcpMsgs[actualslot].msg.payload.value; // inverte o valor do payload para teste (ex: se for 1, vira 0 e vice-versa)
@@ -152,9 +152,9 @@ void applicationTask(void* pvParameters) {
                     //verifica se há mensagens vindas da rede LoRa
                     //seria necessario aqui tambem montar um pacote para enviar para a aplicação
                     if(xQueueReceive(q_comm2app, &msgRx, 0) == pdTRUE){ 
-                        log_i("Resposta do ed %d recebida. FCT=%d value=%d", msgRx.src, msgRx.function, msgRx.payload.value);
+                        // log_i("Resposta do ed %d recebida. FCT=%d value=%d", msgRx.src, msgRx.function, msgRx.payload.value);
 
-                        dstTask = TCP;
+                        // dstTask = TCP; não utilizada por enquanto
 
                         //verifica o tipo de função
                         switch(msgRx.function){
@@ -179,11 +179,9 @@ void applicationTask(void* pvParameters) {
 
                             case FCT_READING:
                                 // a divisao por 100 é para converter o valor inteiro de volta para float
-                                float value = msgRx.payload.value*100 ;
-                                log_i("Valor lido: %.2f",value);
 
                                 #if DISPLAY_ENABLE
-                                    sprintf(display_line3,"Leitura: %.2f",value);
+                                    sprintf(display_line3,"Leitura: %.2f",msgRx.payload.value);
                                     Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
                                 #endif
                                 break;
@@ -206,7 +204,7 @@ void applicationTask(void* pvParameters) {
                         else if(slot < MAX_SLOTS){
                             tcpMsgs[slot].msg = msgRx;
                             tcpMsgs[slot].ocupado = true;
-                            log_i("Mensagem recebida do TCP para o slot %d", slot);
+                            // log_i("Mensagem recebida do TCP para o slot %d", slot);
                         }
                         else{
                             log_e("Slot inválido recebido do TCP: %d", slot);
@@ -218,7 +216,7 @@ void applicationTask(void* pvParameters) {
                 else{
                     // log_i("Aguardando pacote LoRa... Slot atual: %d", actualslot);
                     if(xQueueReceive(q_comm2app,&msgRx,0) == pdTRUE){
-                        log_i("Mensagem recebida! FCT=%d",msgRx.function);
+                        // log_i("Mensagem recebida! FCT=%d",msgRx.function);
                         //verifica o tipo de função
                         switch (msgRx.function){
                             case FCT_BEACON:
@@ -282,7 +280,7 @@ void applicationTask(void* pvParameters) {
                                     msgTx.seqnum = loramesh.mydd.seqnum; //o seqnum da resposta é o mesmo da requisição
                                     msgTx.function = FCT_READING;
                                     msgTx.size = sizeof(TensaoDeSaida);
-                                    msgTx.payload.value = 2048; //valor ficticio
+                                    msgTx.payload.value = 0xAB0000AB; //valor ficticio
                                     
                                 }
                                 else if(msgRx.start == LEDP){
@@ -345,7 +343,7 @@ void applicationTask(void* pvParameters) {
                 msg_t TxStatus;
                 if(xQueueReceive(q_comm2app, &TxStatus, 0) == pdTRUE){
                     if(TxStatus.function == FCT_TXDONE){
-                        log_i("Transmissão concluída. Voltando para modo de escuta.");
+                        // log_i("Transmissão concluída. Voltando para modo de escuta.");
                         send_pct = 0;
                         nextstate = ST_STARTRX;
                     }
@@ -358,7 +356,7 @@ void applicationTask(void* pvParameters) {
                 if (send_pct == 0){
                     send_pct = 1;
                     rx_timeout = (loramesh.mydd.devtype == DEV_TYPE_ROUTER) ? 0 : 0; 
-                    log_i("Sent...startReceiving=%d",rx_timeout);
+                    // log_i("Sent...startReceiving=%d",rx_timeout);
                     loramesh.ClearRadioIRQs();
                     res= loramesh.startReceiving(rx_timeout);
                     if (res != RADIOLIB_ERR_NONE) {

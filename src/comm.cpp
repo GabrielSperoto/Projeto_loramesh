@@ -101,21 +101,16 @@ void CommTask(void* pvParameters) {
 
     while (true) {
 
-        // log_i("Comm task iniciada. Slot atual: %d", actualslot);
-
         //verifica se há mensagem do radio
         if (loramesh.receivePacket()) {
-            //aqui talvez seria interessante descompactar a mensagem recebida em lastpkt para envia-la pelas tarefas atraves da estrtutura msg
-
             log_i("Pacote recebido no slot %d", actualslot);
 
             loramesh.decodeLoraPacket(&msgRx);
 
             
-            // msg.rssi = loramesh.packetRssi(); //o que e esse rssi?
             if(xQueueSend(q_comm2app, &msgRx, 0) == pdTRUE){
-                log_i("Mensagem da rede LoRa enviada para a aplicação. Src: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
-                    msgRx.src, msgRx.function, msgRx.start, msgRx.qtdParametros, msgRx.payload.value);
+                // log_i("Mensagem da rede LoRa enviada para a aplicação. Src: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
+                //     msgRx.src, msgRx.function, msgRx.start, msgRx.qtdParametros, msgRx.payload.value);
                 }
             else{
                 log_i("Erro ao enviar mensagem para a aplicação");
@@ -132,7 +127,7 @@ void CommTask(void* pvParameters) {
                 //apos finalizar a transmissão, enviar um status para a aplicação indicando que a transmissão foi concluída
                 msg_t txStatus;
                 txStatus.function = FCT_TXDONE;
-                log_i("Mensagem enviada! Dst: %d Function: %d Value: %d", msgTx.dst, msgTx.function, msgTx.payload.value); 
+                // log_i("Mensagem enviada! Dst: %d Function: %d Value: %d", msgTx.dst, msgTx.function, msgTx.payload.value); 
                 xQueueSend(q_comm2app,&txStatus, 0);
             }
             else

@@ -45,10 +45,6 @@
 
 // O __attribute__((packed)) garante que a estrutura tenha o tamanho exato dos bytes somados
 typedef struct __attribute__((packed)) {
-    // uint8_t  srcaddress;
-    // uint8_t  dstaddress;
-    // uint8_t  fct;
-    // uint16_t seqnum;
     uint8_t  packetSize;
     uint8_t  payload[BUFFER_SIZE]; // Troquei de rxpacket para payload
 } strPacket;

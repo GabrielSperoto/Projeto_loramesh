@@ -42,7 +42,7 @@ volatile bool operationDone = false;
 //{DeviceID, DEV_TYPE, DeviceAddress, dataslot}
 #if defined ( WIFI_LoRa_32_V2 )
 strDevicedescription devid[]={
-   {0xACFD,DEV_TYPE_ROUTER,1,0},
+   {0xB40C,DEV_TYPE_ROUTER,1,0},
    {0xF482,DEV_TYPE_ENDDEV,2,2},
    {0xCC7F,DEV_TYPE_ENDDEV,3,3},
    {0X8096,DEV_TYPE_ENDDEV,4,4},
@@ -490,18 +490,6 @@ uint16_t LoRaClass::getseqnum(uint8_t *packet,uint8_t len){
 
 }
 
-// uint8_t LoRaClass::getfunction(uint8_t *packet,uint8_t len){
-//     uint8_t function;
-
-//     if (len > 3){
-//         function = packet[2];
-//         //log_i ("function=%d",function);
-//         return function;
-//     }
-//     else
-//         return 0;
-
-// }
 
 // uint32_t LoRaClass::gettimestamp(uint8_t *packet,uint8_t len){
 //     uint32_t timestamp;
@@ -562,8 +550,7 @@ uint32_t LoRaClass::getPayloadValue(uint8_t *packet, uint8_t len) {
   if (len > 0) {
     uint32_t value = 0;
     uint8_t* buffer = &packet[6];
-
-    log_i("getPayloadValue: len=%d, buffer[0..%d]=%02x %02x %02x %02x", len, len-1, buffer[0], buffer[1], buffer[2], buffer[3]);
+    // log_i("getPayloadValue: len=%d, buffer[0..%d]=%02x %02x %02x %02x", len, len-1, buffer[0], buffer[1], buffer[2], buffer[3]);
 
     // Monta o valor dependendo de quantos bytes chegaram
     switch (len) {
@@ -596,21 +583,6 @@ uint8_t LoRaClass::getWrittingCode(){
   return -1;
 }
 
-// uint8_t LoRaClass::getSrcAdress(){
-//   return lastpkt.payload[0];
-// }
-
-// uint8_t LoRaClass::getFunctionCode(){
-//   return lastpkt.payload[4];
-// }
-
-// uint8_t LoRaClass::getStart(){
-//   return 0;
-// }
-
-// uint8_t LoRaClass::getQtdParametros(){
-//   return 0;
-// }
 
 uint8_t LoRaClass::getSizeMsg(){
   return lastpkt.packetSize;
@@ -630,6 +602,7 @@ void LoRaClass::decodeLoraPacket(msg_t *msg){
   uint8_t *rxPacket = lastpkt.payload;
   uint8_t size = lastpkt.packetSize;
 
+  log_i("lastpkt.payload[6]: %02x", lastpkt.payload[6]);
   msg->dst = rxPacket[0];
   msg->src = rxPacket[1];
   msg->seqnum = (rxPacket[2] << 8) | rxPacket[3];
@@ -806,6 +779,7 @@ bool LoRaClass::receivePacket()
 #endif
 
         // verifica o srcaddress e dstaddress do pacote
+        // log_i("lastpkt.payload[6]: %02x", lastpkt.payload[6]);
         dstadress = lastpkt.payload[0];
         srcadress = lastpkt.payload[1];
         fct = lastpkt.payload[4];
