@@ -490,35 +490,35 @@ uint16_t LoRaClass::getseqnum(uint8_t *packet,uint8_t len){
 
 }
 
-uint8_t LoRaClass::getfunction(uint8_t *packet,uint8_t len){
-    uint8_t function;
+// uint8_t LoRaClass::getfunction(uint8_t *packet,uint8_t len){
+//     uint8_t function;
 
-    if (len > 3){
-        function = packet[2];
-        //log_i ("function=%d",function);
-        return function;
-    }
-    else
-        return 0;
+//     if (len > 3){
+//         function = packet[2];
+//         //log_i ("function=%d",function);
+//         return function;
+//     }
+//     else
+//         return 0;
 
-}
+// }
 
-uint32_t LoRaClass::gettimestamp(uint8_t *packet,uint8_t len){
-    uint32_t timestamp;
-    uint8_t *pucaux = (uint8_t *) &timestamp;
+// uint32_t LoRaClass::gettimestamp(uint8_t *packet,uint8_t len){
+//     uint32_t timestamp;
+//     uint8_t *pucaux = (uint8_t *) &timestamp;
 
-    if (len > 5){
-        *pucaux++ = packet[8];
-        *pucaux++ = packet[7];
-        *pucaux++ = packet[6];
-        *pucaux = packet[5];
-        //log_i ("timestamp=%4x",timestamp);
-        return timestamp;
-    }
-    else
-        return 0;
+//     if (len > 5){
+//         *pucaux++ = packet[8];
+//         *pucaux++ = packet[7];
+//         *pucaux++ = packet[6];
+//         *pucaux = packet[5];
+//         //log_i ("timestamp=%4x",timestamp);
+//         return timestamp;
+//     }
+//     else
+//         return 0;
 
-}
+// }
 
 
 //Todo!!! implementar um CRC
@@ -551,12 +551,12 @@ uint16_t LoRaClass::getLastPctSeqNum(){
     return ((lastpkt.payload[2] << 8) | lastpkt.payload[3]);
 }
 
-uint8_t LoRaClass::getResponseStatus(){
-  uint8_t* rxPacket = lastpkt.payload;
-  uint8_t size = lastpkt.packetSize;
-  if(size > 5) return rxPacket[5];
-  return -1;
-}
+// uint8_t LoRaClass::getResponseStatus(){
+//   uint8_t* rxPacket = lastpkt.payload;
+//   uint8_t size = lastpkt.packetSize;
+//   if(size > 5) return rxPacket[5];
+//   return -1;
+// }
 
 uint32_t LoRaClass::getPayloadValue(uint8_t *packet, uint8_t len) {
   if (len > 0) {
@@ -596,21 +596,21 @@ uint8_t LoRaClass::getWrittingCode(){
   return -1;
 }
 
-uint8_t LoRaClass::getSrcAdress(){
-  return lastpkt.payload[0];
-}
+// uint8_t LoRaClass::getSrcAdress(){
+//   return lastpkt.payload[0];
+// }
 
-uint8_t LoRaClass::getFunctionCode(){
-  return lastpkt.payload[4];
-}
+// uint8_t LoRaClass::getFunctionCode(){
+//   return lastpkt.payload[4];
+// }
 
-uint8_t LoRaClass::getStart(){
-  return 0;
-}
+// uint8_t LoRaClass::getStart(){
+//   return 0;
+// }
 
-uint8_t LoRaClass::getQtdParametros(){
-  return 0;
-}
+// uint8_t LoRaClass::getQtdParametros(){
+//   return 0;
+// }
 
 uint8_t LoRaClass::getSizeMsg(){
   return lastpkt.packetSize;

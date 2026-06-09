@@ -110,7 +110,7 @@ void applicationTask(void* pvParameters) {
                     msgTx.seqnum = loramesh.mydd.seqnum; //o seqnum é incrementado na função de envio do pacote
                     msgTx.function = FCT_BEACON;
                     msgTx.size = 4;
-                    msgTx.payload.value = millis() & 0xFFFFFFFF; // exemplo de payload, pode ser o timestamp ou outro dado relevante
+                    msgTx.payload.value = 0; // timestamp zerado para verificar uma condição de overflow
 
                     #if DISPLAY_ENABLE
                         sprintf(display_line3,"seqnum: %d",loramesh.mydd.seqnum);
@@ -276,15 +276,13 @@ void applicationTask(void* pvParameters) {
                                 //verifica o parametro da leitura
                                 if(msgRx.start == POT){
                                     //obtem o valor do potenciometro e retorna na resposta
-                                    uint16_t valorPot = analogRead(PinPot);
-                                    log_i("Valor do potenciometro lido: %d", valorPot);
-                                    uint32_t TensaoDeSaida = (((float)valorPot / 4095.0) * 3.3)/100;
+                    
                                     msgTx.src = loramesh.mydd.devaddr;
                                     msgTx.dst = 1; //endereço do router
                                     msgTx.seqnum = loramesh.mydd.seqnum; //o seqnum da resposta é o mesmo da requisição
                                     msgTx.function = FCT_READING;
                                     msgTx.size = sizeof(TensaoDeSaida);
-                                    msgTx.payload.value = TensaoDeSaida;
+                                    msgTx.payload.value = 2048; //valor ficticio
                                     
                                 }
                                 else if(msgRx.start == LEDP){
@@ -320,61 +318,23 @@ void applicationTask(void* pvParameters) {
                 if (loramesh.mydd.devtype == DEV_TYPE_ROUTER){
 
                     if(dstTask == COMM){
-                        //mensagem vinda do TCP, deve ser enviada para o ED
-                        
-                        // if(msgTx.function == FCT_BEACON){
-                        //     log_i("Mensagem de beacon enviada para a rede LoRa");
-                        // }
-                        // else
-                        //     log_i("Mensagem do TCP enviada no slot %d para o ed %d", actualslot, msgTx.dst);
-                        
+                        //mensagem vinda do TCP, deve ser enviada para a rede LoRa
                         xQueueSend(q_app2comm, &msgTx, 0);
-                        
                     }
 
                     else if(dstTask == TCP){
                         //mensagem vinda da rede LoRa, deve ser enviada para o TCP
                         //a mensagem já está pronta para ser enviada, basta colocá-la na fila q_app2tcp
                         xQueueSend(q_app2tcp, &msgTx, 0);
-
-                        // log_i("Mensagem da rede LoRa enviada para o TCP. Src: %d, Dst: %d, Function: %d, Start: %d, QtdParametros: %d, Data: %d", 
-                        //     msgTx.src, msgTx.dst, msgTx.function, msgTx.start, msgTx.qtdParametros, msgTx.payload.value);
                     }
 
 
                 }
                 else{//end device
-
-
-                    //como o ed so possui um fluxo de comunicação (resposta ao router), ele simplesmente pega a mensagem da fila q_comm2app e envia para o router
-                    xQueueSend(q_app2comm, &msgTx, 0);
-                //     //resposta de leitura do ED
-                //     if(rxMsg.function == FCT_READING){
-                //         // o valor é multiplicado por 100 para enviar como inteiro
-                //         uint32_t value= TensaoDeSaida*100;
-                //         uint8_t *pucaux = (uint8_t *) &value;
-                //         // log_i("Value: %d",value);
-                //         txmsg.dst = 1;
-                //         txmsg.function = FCT_READING;
-                //         txmsg.size = sizeof(value);
-                //         txmsg.value = 0;
-                //         txmsg.payload[0] = *(pucaux+3);
-                //         txmsg.payload[1] = *(pucaux+2);
-                //         txmsg.payload[2] = *(pucaux + 1);
-                //         txmsg.payload[3] = *pucaux;
-                //         xQueueSend(txQueue, &txmsg, 0);
-
-                // }   else {
-                //         //reposta de escrita do ED
-                //         txmsg.dst = 1;
-                //         txmsg.function = FCT_WRITTING;
-                //         txmsg.size = 0;
-                //         txmsg.start = 0;
-                //         txmsg.qtdParametros = 0;
-                //         txmsg.value = 1; //código de sucesso
-                        
-                //         xQueueSend(txQueue, &txmsg, 0);
-                // }
+                    //messagem vinda da aplicação, deve ser enviada para a rede LoRa
+                    if(xQueueSend(q_app2comm, &msgTx, 0) != pdTRUE){
+                        log_e("Falha ao enviar mensagem para a fila q_app2comm");
+                    };
                 }
                 // send_pct = 0;
                 nextstate = ST_WAITTXDONE;

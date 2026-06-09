@@ -174,8 +174,9 @@ void setup() {
     //endev
     if (loramesh.mydd.devtype == DEV_TYPE_ENDDEV && loramesh.mydd.devaddr == 4){
 
-        xTaskCreatePinnedToCore(LerPotenciometro, "LerPotenciometroTask", 2048, NULL, 1, &LerPotenciometro_TaskHandle, 1);
-        log_i("Tarefa de leitura do potenciômetro criada.");
+        //a leitura do potenciometro deve ser feita na aplication task
+        // xTaskCreatePinnedToCore(LerPotenciometro, "LerPotenciometroTask", 2048, NULL, 1, &LerPotenciometro_TaskHandle, 1);
+        // log_i("Tarefa de leitura do potenciômetro criada.");
     } 
     else{ // router
         #if 0 //tarefa é desativada para depuração

@@ -42,8 +42,6 @@
 #define POLYNOMIAL_CRC 0x1021                       // Define o polinômio para o cálculo do CRC-16-CCITT
 
 
-void LoraSendFrame(String data,size_t len);
-uint8_t LoraReceiveFrame(char *pframe);
 
 // O __attribute__((packed)) garante que a estrutura tenha o tamanho exato dos bytes somados
 typedef struct __attribute__((packed)) {
@@ -157,13 +155,6 @@ public:
   int startReceiving(uint32_t timeout);
   
 
-  uint8_t sendPacketReq(uint8_t dst, uint8_t fct, uint8_t start, uint8_t qtdParametros);
-  uint8_t sendBeacon(long timestamp);
-  uint8_t sendBeacontRes(uint8_t dstaddr); //envio de uma resposta de beacon
-  uint8_t sendReadingReq(uint8_t dstaddr,uint8_t start, uint8_t qtdParametros);
-  uint8_t sendReadingRes(uint8_t dst, uint8_t size, uint8_t *buf); //envio de uma resposta de leitura
-  uint8_t sendWrittingReq(uint8_t dst, uint8_t start, uint8_t qtdParametros, uint8_t value); 
-  uint8_t sendWrittingRes(uint8_t dst, uint8_t status);
   void decodeLoraPacket(msg_t *msg);
   uint8_t encodeAndSendPacket(msg_t *msg);
 
@@ -171,20 +162,21 @@ public:
   void setDioActionsForReceivePacket(void);
   void clearDioActions(void);
   void onReceive(void);
+  
   uint8_t getrouteaddr(void);
   uint16_t calculate_crc (uint8_t *packet, uint8_t len);
-  uint8_t getaddress(uint8_t *packet,uint8_t len);
-  uint32_t gettimestamp(uint8_t *packet,uint8_t len);
-  uint8_t getfunction(uint8_t *packet,uint8_t len);
+//   uint8_t getaddress(uint8_t *packet,uint8_t len);
+//   uint32_t gettimestamp(uint8_t *packet,uint8_t len);
+//   uint8_t getfunction(uint8_t *packet,uint8_t len);
   uint16_t getseqnum(uint8_t *packet,uint8_t len);
   uint16_t getLastSeqNum(void);
   uint16_t getLastPctSeqNum(void);
-  uint8_t getResponseStatus(void);
+//   uint8_t getResponseStatus(void);
   uint32_t getPayloadValue(uint8_t *packet, uint8_t len); // obtem o valor de leitura
   uint8_t getWrittingCode(void);
 
-  uint8_t getSrcAdress();
-  uint8_t getFunctionCode();
+//   uint8_t getSrcAdress();
+//   uint8_t getFunctionCode();
   uint8_t getStart();
   uint8_t getQtdParametros();
   uint8_t getSizeMsg();
