@@ -1,7 +1,4 @@
-#include "devconfig.h"
 #include "loramesh.h"
-#include <RadioLib.h>
-#include "radio.h"
 
 #if defined ( WIFI_LoRa_32_V3 )
 #include <modules/sx126x/sx1262.h>

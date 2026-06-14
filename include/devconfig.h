@@ -35,13 +35,14 @@
 #define SYNC_P     0b01000010
 #define LOG_LOCAL_LEVEL CONFIG_LOG_MAXIMUM_LEVEL
  
-//#define RX_TIMEOUT_VALUE   1000
+#define RX_ROUTER_TIMEOUT 1000
+#define RX_ENDDEV_TIMEOUT 2000
 
 //#define MINIMUM_DELAY 900 
 
 #define MAX_ADDR 5
 #define BROADCAST_ADDR 0
-#define BYTE_CRC 0x66
+#define POLYNOMIAL_CRC 0x1021                       // Define o polinômio para o cálculo do CRC-16-CCITT
 
 #define MAX_PACKET_SIZE  30
 

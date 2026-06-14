@@ -3,6 +3,9 @@
 
 #include <Arduino.h>
 #include <SPI.h>
+#include "devconfig.h"
+#include <RadioLib.h>
+#include "radio.h"
 
 
 #if defined( WIFI_LoRa_32_V3 )
@@ -39,7 +42,7 @@
 #define RF_PADAC_20DBM_ON                           0x07
 #define RF_PADAC_20DBM_OFF                          0x04  // Default
 
-#define POLYNOMIAL_CRC 0x1021                       // Define o polinômio para o cálculo do CRC-16-CCITT
+
 
 
 
