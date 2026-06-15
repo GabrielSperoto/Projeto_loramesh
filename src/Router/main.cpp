@@ -1,5 +1,11 @@
 #include "main.h"
 
+QueueHandle_t txQueue;    //App transmite para comunicacao
+QueueHandle_t rxQueue;    //Comunicacao responde para App
+QueueHandle_t q_tcp2app;   //Tcp transmite para app
+QueueHandle_t q_app2tcp;   //app transmite para tcp
+QueueHandle_t q_app2comm;  //app trasmite para comm
+QueueHandle_t q_comm2app;  //comm transmite para app
 
 TaskHandle_t App_TaskHandle = nullptr;
 TaskHandle_t Send_TaskHandle = nullptr;
@@ -22,6 +28,7 @@ uint16_t valorPot = 0;
 float TensaoDeSaida = 0;
 
 uint16_t idx_response = 0;
+uint32_t lastActivityMillis = 0;
 
 void displayline(uint8_t line, char *pucMsg, ...) {
 

@@ -37,12 +37,12 @@ extern char display_line3[20];
 extern uint16_t valorPot;
 extern float TensaoDeSaida;
 
-QueueHandle_t txQueue;    //App transmite para comunicacao
-QueueHandle_t rxQueue;    //Comunicacao responde para App
-QueueHandle_t q_tcp2app;   //Tcp transmite para app
-QueueHandle_t q_app2tcp;   //app transmite para tcp
-QueueHandle_t q_app2comm;  //app trasmite para comm
-QueueHandle_t q_comm2app;  //comm transmite para app
+extern QueueHandle_t txQueue;    //App transmite para comunicacao
+extern QueueHandle_t rxQueue;    //Comunicacao responde para App
+extern QueueHandle_t q_tcp2app;   //Tcp transmite para app
+extern QueueHandle_t q_app2tcp;   //app transmite para tcp
+extern QueueHandle_t q_app2comm;  //app trasmite para comm
+extern QueueHandle_t q_comm2app;  //comm transmite para app
 
 extern uint16_t idx_response;
 

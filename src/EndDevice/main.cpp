@@ -27,12 +27,6 @@ char display_line3[20];
 uint16_t valorPot = 0;
 float TensaoDeSaida = 0;
 
-QueueHandle_t txQueue;    //App transmite para comunicacao
-QueueHandle_t rxQueue;    //Comunicacao responde para App
-QueueHandle_t q_tcp2app;   //Tcp transmite para app
-QueueHandle_t q_app2tcp;   //app transmite para tcp
-QueueHandle_t q_app2comm;  //app trasmite para comm
-QueueHandle_t q_comm2app;  //comm transmite para app
 
 uint16_t idx_response = 0;
 
