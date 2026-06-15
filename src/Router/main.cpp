@@ -1,6 +1,28 @@
 #include "main.h"
 
 
+TaskHandle_t App_TaskHandle = nullptr;
+TaskHandle_t Send_TaskHandle = nullptr;
+TaskHandle_t Watchdog_TaskHandle = nullptr;
+// TaskHandle_t LerPotenciometro_TaskHandle = nullptr;
+TaskHandle_t TCP_Communication_TaskHandle = nullptr;
+
+// Variáveis globais de estado
+extern LoRaClass loramesh;
+// extern volatile bool messageReceived;
+// char rxpacket[BUFFER_SIZE];
+#if DISPLAY_ENABLE  
+char display_line1[20];
+char display_line2[20];
+char display_line3[20];
+#endif
+
+#define PinPot 37
+uint16_t valorPot = 0;
+float TensaoDeSaida = 0;
+
+uint16_t idx_response = 0;
+
 void displayline(uint8_t line, char *pucMsg, ...) {
 
     #if DISPLAY_ENABLE  

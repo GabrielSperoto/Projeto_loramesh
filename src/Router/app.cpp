@@ -26,10 +26,6 @@ void node_init_sync(uint32_t new_FR);
 extern float TensaoDeSaida;
 extern uint16_t valorPot;
 
-extern char display_line1[20];
-extern char display_line2[20];
-extern char display_line3[20];
-
 bool ledtoogle = 0;
 
 tcpMsgs_t tcpMsgs[MAX_SLOTS]; // array usado para receber mensagens do TCP e armazenar no slot correspondente

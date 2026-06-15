@@ -20,7 +20,6 @@ uint8_t lastslot = 0;
 
 void slottimecontrol(void);
 void node_init_sync(uint32_t new_FR);
-void displayline(uint8_t line, char *pucMsg, ...);
 
 bool ledtoogle = 0;
 
