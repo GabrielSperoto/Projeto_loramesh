@@ -8,15 +8,9 @@
 #include "Lora/loramesh.h"
 
 
-
-// #define PinLED 25
-// #define PinPOT 2
-
 int count = 0;
 
 WebSocketsClient webSocket;
-// TxMessage_t txMsg;
-// RxMessage_t rxMsg;
 msg_t msg;
 
 extern class LoRaClass loramesh;
@@ -25,15 +19,16 @@ extern class LoRaClass loramesh;
 unsigned long lastReconnectAttempt = 0;
 static unsigned long lastSend = 0;
 
+void wifiTick();
 void connectToWiFi();
 void reconnect();
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 void SendMessage(String src, String dst, String fct, String param, String val);
 
 
+
 void init_TCP_comm() {
   connectToWiFi();
-
   // Conecta ao WebSocket Server
   webSocket.begin(server_ip, server_port, "/");
   webSocket.onEvent(webSocketEvent);
@@ -43,7 +38,35 @@ void init_TCP_comm() {
 
 
 void TCP_communicationTask(void* pvParameters){
+
+  uint8_t count = 0;
+
+  init_TCP_comm();
   while(true){
+    
+    webSocket.loop();
+    reconnect();
+
+    if(WiFi.status() != WL_CONNECTED){
+      vTaskDelay(1000 / portTICK_PERIOD_MS);
+      continue;
+    }
+
+    if(!webSocket.isConnected() && count <=3 && millis() - lastReconnectAttempt > 2000){
+      // Envia um beacon a cada 30 segundos para manter a conexão ativa
+      webSocket.begin(server_ip, server_port, "/");
+      lastReconnectAttempt = millis();
+      count++;
+      continue;
+    }
+
+    if(!webSocket.isConnected() && count >= 3 && millis() - lastReconnectAttempt > 10000){
+      // Envia um beacon a cada 30 segundos para manter a conexão ativa
+      webSocket.begin(server_ip, server_port, "/");
+      lastReconnectAttempt = millis();
+      if(webSocket.isConnected()) count = 0;
+    }
+
 
     if(xQueueReceive(q_app2tcp,&msg, 10/portTICK_PERIOD_MS) == pdTRUE){
       //descompacta a mensgaem recebida e envia para app
@@ -56,8 +79,6 @@ void TCP_communicationTask(void* pvParameters){
       SendMessage(src, dst, fct, param, val);
       
     }
-    webSocket.loop();
-    reconnect();
     vTaskDelay(10 / portTICK_PERIOD_MS);
   }
 }
@@ -71,9 +92,7 @@ void connectToWiFi() {
   while (WiFi.status() != WL_CONNECTED) {
     uint32_t lastime = millis();
     //delay de 500ms
-    while(millis() - lastime < 500){}
-    // delay(500);
-    log_i(".");
+    vTaskDelay(500/portTICK_PERIOD_MS);
   }
 
   log_i("Conectado ao Wifi!");
@@ -87,7 +106,9 @@ void reconnect() {
     log_i("Tentando reconectar ao servidor WebSocket...");
     webSocket.begin(server_ip, server_port, "/");
     lastReconnectAttempt = millis();
+
   }
+
 }
 
 
@@ -129,15 +150,6 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     uint8_t val_num = strtol(val, nullptr, 10);
     uint8_t param_num = strtol(param, nullptr, 10);
 
-    //guarda a mensagem no payload de rxMsg
-
-    //todo processo é feito usando a esturua msg
-    // rxMsg.src = src_addr;
-    // rxMsg.dst = dst_addr;
-    // rxMsg.function = function_num;
-    // rxMsg.value = val_num;
-    // rxMsg.start = param_num;
-    // rxMsg.dst = dst_addr;
 
     msg.src = src_addr;
     msg.dst = dst_addr;
@@ -153,63 +165,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   
     log_i("Queue enviada. Src: %d, Dst: %d, Fct: %d, Param: %d, Val: %d", src_addr, dst_addr, function_num, param_num, msg.payload.value);
 
-    //a mensagem é agora enviada pela rede
-
-    // Verifica se a mensagem é destinada a este dispositivo
-    // if (src && strcmp(src, "0x907F") == 0) {
-    //   Serial.println("Mensagem destinada a mim!");
-
-    //   /*-------------------------------------------- LEITURA --------------------------------------------*/
-    //   if (fct && strcmp(fct, "read") == 0) {
-
-    //     /* ---------------------- Verifica se é no Pot ----------------------*/
-    //     if(param && strcmp(param, "1") == 0) {
-    //       std::string valorStr = std::to_string(count);
-    //       SendMessage(src, dst, fct, param, valorStr.c_str());
-    //     }
-
-    //     /* ---------------------- Verifica se é no LED ----------------------*/  
-    //     else if(param && strcmp(param, "2") == 0) {
-    //       SendMessage(src, dst, fct, param, (digitalRead(PinLED) == HIGH ? "true" : "false"));
-    //     }
-    //   }
-
-
-
-    //   /*-------------------------------------------- ESCRITA --------------------------------------------*/
-    //   else if (fct && strcmp(fct, "write") == 0) {
-    //     const char* val = doc["val"];
-
-    //     /* ---------------------- Verifica se é no Pot ----------------------*/
-    //     if(param && strcmp(param, "1") == 0) {
-    //       if (val && strcmp(val, "true") == 0) {
-    //         digitalWrite(PinLED, HIGH);
-    //       } 
-          
-    //       else {
-    //         digitalWrite(PinLED, LOW);
-    //       }
-
-    //       SendMessage(src, dst, fct, param, (digitalRead(PinLED) == HIGH ? "true" : "false")); // Envia confirmação do novo estado
-    //     }
-
-    //     /* ---------------------- Verifica se é no LED ----------------------*/  
-    //     if(param && strcmp(param, "2") == 0 ) {
-          
-    //       if (val && strcmp(val, "true") == 0) {
-    //         digitalWrite(PinLED, HIGH);
-    //         count++;
-    //       } 
-          
-    //       else {
-    //         digitalWrite(PinLED, LOW);
-    //       }
-
-    //       SendMessage(src, dst, fct, param, (digitalRead(PinLED) == HIGH ? "true" : "false")); // Envia confirmação do novo estado
-    //     }
-        
-    //   }
-    // }
+    
   }
 }
 

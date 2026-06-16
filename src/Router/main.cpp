@@ -143,7 +143,6 @@ void setup() {
 
     #if 1 //tarefa é desativada para depuração
     xTaskCreatePinnedToCore(TCP_communicationTask, "TCP_CommunicationTask", 4096, NULL, 2, &TCP_Communication_TaskHandle, 1);
-    init_TCP_comm();
     #endif
 
     initcomm();
