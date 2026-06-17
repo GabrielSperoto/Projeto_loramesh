@@ -39,7 +39,9 @@ void init_TCP_comm() {
 
 void TCP_communicationTask(void* pvParameters){
 
-  uint8_t count = 0;
+  uint8_t tentativasFalhas = 0;
+  uint32_t tempoDeEsperaMs = 1000; // Começa esperando 1 segundo
+  const uint32_t TEMPO_MAXIMO_MS = 30000; // Teto de 30 segundos
 
   init_TCP_comm();
   while(true){
@@ -52,19 +54,32 @@ void TCP_communicationTask(void* pvParameters){
       continue;
     }
 
-    if(!webSocket.isConnected() && count <=3 && millis() - lastReconnectAttempt > 2000){
-      // Envia um beacon a cada 30 segundos para manter a conexão ativa
-      webSocket.begin(server_ip, server_port, "/");
-      lastReconnectAttempt = millis();
-      count++;
-      continue;
+    if (!webSocket.isConnected()) {
+        tentativasFalhas++;
+        log_i("Tentando reconectar ao WebSocket. Tentativa: %d", tentativasFalhas);
+        
+        // Tenta reconectar
+        webSocket.begin(server_ip, server_port, "/");
+
+        // Se falhou 3 vezes, começa a aumentar o tempo de espera
+        if (tentativasFalhas >= 3) {
+            tempoDeEsperaMs *= 2; // Dobra o tempo de espera (2s, 4s, 8s...)
+            if (tempoDeEsperaMs > TEMPO_MAXIMO_MS) {
+                tempoDeEsperaMs = TEMPO_MAXIMO_MS; // Trava no máximo de 30s
+            }
+            log_i("Muitas falhas. Aumentando o intervalo para %d ms", tempoDeEsperaMs);
+        }
+
+        // Dorme pelo tempo estipulado antes de tentar de novo
+        vTaskDelay(tempoDeEsperaMs / portTICK_PERIOD_MS);
+        continue;
     }
 
-    if(!webSocket.isConnected() && count >= 3 && millis() - lastReconnectAttempt > 10000){
-      // Envia um beacon a cada 30 segundos para manter a conexão ativa
-      webSocket.begin(server_ip, server_port, "/");
-      lastReconnectAttempt = millis();
-      if(webSocket.isConnected()) count = 0;
+    // Reseta os contadores para o estado inicial, pois o link está saudável
+    if (tentativasFalhas > 0) {
+        log_i("Conexão reestabelecida! Resetando contadores de backoff.");
+        tentativasFalhas = 0;
+        tempoDeEsperaMs = 1000; 
     }
 
 
@@ -120,7 +135,8 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     // Assim que conectar, se identifica com o servidor
     StaticJsonDocument<128> identifyMsg;
     identifyMsg["src"] = std::to_string(loramesh.mydd.devserialnumber);
-    identifyMsg["info"] = "ESP32 conectada";
+    identifyMsg["type"] = "login_router";
+    identifyMsg["nodes"] = loramesh.getNodes().nodes;
     String json;
     serializeJson(identifyMsg, json);
     webSocket.sendTXT(json);
