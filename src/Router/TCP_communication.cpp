@@ -19,11 +19,13 @@ extern class LoRaClass loramesh;
 unsigned long lastReconnectAttempt = 0;
 static unsigned long lastSend = 0;
 
-void wifiTick();
 void connectToWiFi();
 void reconnect();
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 void SendMessage(String src, String dst, String fct, String param, String val);
+void sendRouterID();
+void disconnectedRoutine();
+void textDataManager(uint8_t * payload);
 
 
 
@@ -39,62 +41,31 @@ void init_TCP_comm() {
 
 void TCP_communicationTask(void* pvParameters){
 
-  uint8_t tentativasFalhas = 0;
-  uint32_t tempoDeEsperaMs = 1000; // Começa esperando 1 segundo
-  const uint32_t TEMPO_MAXIMO_MS = 30000; // Teto de 30 segundos
-
   init_TCP_comm();
   while(true){
     
     webSocket.loop();
-    reconnect();
-
+  
     if(WiFi.status() != WL_CONNECTED){
       vTaskDelay(1000 / portTICK_PERIOD_MS);
-      continue;
     }
+    
+    if(WiFi.status() == WL_CONNECTED && webSocket.isConnected()){
 
-    if (!webSocket.isConnected()) {
-        tentativasFalhas++;
-        log_i("Tentando reconectar ao WebSocket. Tentativa: %d", tentativasFalhas);
+      if(xQueueReceive(q_app2tcp,&msg, 10/portTICK_PERIOD_MS) == pdTRUE){
+        //descompacta a mensgaem recebida e envia para app
+        String src = String(msg.src);
+        String dst = String(msg.dst);
+        String fct = String(msg.function);
+        String param = String(msg.start);
+        String val = String(msg.payload.value);
+  
+        SendMessage(src, dst, fct, param, val);
         
-        // Tenta reconectar
-        webSocket.begin(server_ip, server_port, "/");
-
-        // Se falhou 3 vezes, começa a aumentar o tempo de espera
-        if (tentativasFalhas >= 3) {
-            tempoDeEsperaMs *= 2; // Dobra o tempo de espera (2s, 4s, 8s...)
-            if (tempoDeEsperaMs > TEMPO_MAXIMO_MS) {
-                tempoDeEsperaMs = TEMPO_MAXIMO_MS; // Trava no máximo de 30s
-            }
-            log_i("Muitas falhas. Aumentando o intervalo para %d ms", tempoDeEsperaMs);
-        }
-
-        // Dorme pelo tempo estipulado antes de tentar de novo
-        vTaskDelay(tempoDeEsperaMs / portTICK_PERIOD_MS);
-        continue;
+      }
+      vTaskDelay(10 / portTICK_PERIOD_MS);
     }
-
-    // Reseta os contadores para o estado inicial, pois o link está saudável
-    if (tentativasFalhas > 0) {
-        log_i("Conexão reestabelecida! Resetando contadores de backoff.");
-        tentativasFalhas = 0;
-        tempoDeEsperaMs = 1000; 
-    }
-
-
-    if(xQueueReceive(q_app2tcp,&msg, 10/portTICK_PERIOD_MS) == pdTRUE){
-      //descompacta a mensgaem recebida e envia para app
-      String src = String(msg.src);
-      String dst = String(msg.dst);
-      String fct = String(msg.function);
-      String param = String(msg.start);
-      String val = String(msg.payload.value);
-
-      SendMessage(src, dst, fct, param, val);
-      
-    }
-    vTaskDelay(10 / portTICK_PERIOD_MS);
+    
   }
 }
 
@@ -116,34 +87,75 @@ void connectToWiFi() {
 
 
 /*------------------ Reconexão WebSocket ------------------*/
+
+
+/*------------------ Evento de mensagem ------------------*/
+void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
+  switch(type) {
+		case WStype_DISCONNECTED:
+    reconnect();
+    break;
+		case WStype_CONNECTED: 
+    sendRouterID();
+    break;
+		case WStype_TEXT:
+    textDataManager(payload);
+    break;
+		case WStype_BIN:
+    break;
+		case WStype_ERROR:			
+		case WStype_FRAGMENT_TEXT_START:
+		case WStype_FRAGMENT_BIN_START:
+		case WStype_FRAGMENT:
+		case WStype_FRAGMENT_FIN:
+    break;
+	}
+  
+}
+
 void reconnect() {
   if (!webSocket.isConnected() && millis() - lastReconnectAttempt > 5000) {
     log_i("Tentando reconectar ao servidor WebSocket...");
     webSocket.begin(server_ip, server_port, "/");
+    vTaskDelay(2000/portTICK_PERIOD_MS);
     lastReconnectAttempt = millis();
 
   }
 
 }
 
-
-/*------------------ Evento de mensagem ------------------*/
-void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
-  if (type == WStype_CONNECTED) {
-    log_i("Conectado ao servidor WebSocket!");
-
-    // Assim que conectar, se identifica com o servidor
-    StaticJsonDocument<128> identifyMsg;
-    identifyMsg["src"] = std::to_string(loramesh.mydd.devserialnumber);
+void sendRouterID(){
+  log_i("Conectado ao servidor WebSocket!");
+  
+  StaticJsonDocument<512> identifyMsg;
     identifyMsg["type"] = "login_router";
-    identifyMsg["nodes"] = loramesh.getNodes().nodes;
+    identifyMsg["src"] = String(loramesh.mydd.devserialnumber); 
+    
+    JsonArray nodesArray = identifyMsg.createNestedArray("nodes");
+
+    for(uint8_t i =0; i < sizeof(loramesh.getNodes().nodes)/loramesh.getNodes().nodes[0]; i++){
+      nodesArray.add(loramesh.getNodes().nodes[i]);
+    }
+    
+    // nodesArray.add(2);
+    // nodesArray.add(3);
+    // nodesArray.add(4);
+
     String json;
     serializeJson(identifyMsg, json);
+    
+    // Opcional: Imprime no Serial para garantir que o JSON foi montado corretamente
+    Serial.println("Enviando login: " + json);
+    
     webSocket.sendTXT(json);
-  }
+}
 
-  if (type == WStype_TEXT) {
-    log_i("Mensagem recebida: %s\n", payload);
+void disconnectedRoutine(){
+  ;
+}
+
+void textDataManager(uint8_t * payload){
+  log_i("Mensagem recebida: %s\n", payload);
 
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, payload);
@@ -180,11 +192,7 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
     xQueueSend(q_tcp2app,&msg,0);
   
     log_i("Queue enviada. Src: %d, Dst: %d, Fct: %d, Param: %d, Val: %d", src_addr, dst_addr, function_num, param_num, msg.payload.value);
-
-    
-  }
 }
-
 
 /*----------------------- Envio de resposta -----------------------*/
 void SendMessage(String src, String dst, String fct, String param, String val) {

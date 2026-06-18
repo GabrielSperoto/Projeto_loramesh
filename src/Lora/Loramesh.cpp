@@ -469,7 +469,7 @@ uint8_t LoRaClass::getrouteaddr(){
    return rtaddr; 
 }
 
-// Função para limpar o buffer
+
 Node_t LoRaClass::getNodes() {
     Node_t nodes;
     strDevicedescription* pdd = devid;
@@ -480,6 +480,7 @@ Node_t LoRaClass::getNodes() {
     }
     return nodes;
 }
+
 void LoRaClass::clearBuffer(uint8_t *buffer, int size)
 {
     for (int i = 0; i < size; i++)
