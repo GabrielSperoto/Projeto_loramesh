@@ -47,31 +47,7 @@ void applicationTask(void* pvParameters) {
         tcpMsgs[i].ocupado = false; // inicializa todos os slots como livres
     }
 
-    //tcpMsgs e preenchida manualmente para fins de teste 
-
-    tcpMsgs[3].msg.dst = 3;
-    tcpMsgs[3].msg.src = 1;
-    tcpMsgs[3].msg.function = FCT_READING;
-    tcpMsgs[3].msg.start = POT;
-    tcpMsgs[3].msg.qtdParametros = 1;
-    tcpMsgs[3].msg.payload.value = 0; //valor para acender o led
-    tcpMsgs[3].ocupado = true; //marca o slot como ocupado
-
-    tcpMsgs[2].msg.dst = 2;
-    tcpMsgs[2].msg.src = 1;
-    tcpMsgs[2].msg.function = FCT_WRITTING;
-    tcpMsgs[2].msg.start = LEDP;
-    tcpMsgs[2].msg.qtdParametros = 1;
-    tcpMsgs[2].msg.payload.value = 1; //valor para apagar o led
-    tcpMsgs[2].ocupado = true; //marca o slot como ocupado
-
-    tcpMsgs[4].msg.dst = 4;
-    tcpMsgs[4].msg.src = 1;
-    tcpMsgs[4].msg.function = FCT_READING;
-    tcpMsgs[4].msg.start = POT;
-    tcpMsgs[4].msg.qtdParametros = 1;
-    tcpMsgs[4].msg.payload.value = 0; //valor para acender o led
-    tcpMsgs[4].ocupado = true; //marca o slot como ocupado
+    
 
     while (true) {
         slottimecontrol();
@@ -88,10 +64,7 @@ void applicationTask(void* pvParameters) {
             case ST_TXBEACON:
                 if (actualslot == 0) {
 
-                    tcpMsgs[2].ocupado = true; // marca o slot como ocupado
-                    tcpMsgs[3].ocupado = true; // marca o slot como ocupado
-                    tcpMsgs[4].ocupado = true; // marca o slot como ocupado
-
+                
                     lastActivityMillis = millis();
 
                     memset(&msgTx, 0, sizeof(msg_t)); // Limpa a estrutura msg antes de usá-la
@@ -129,7 +102,6 @@ void applicationTask(void* pvParameters) {
                     msgTx = tcpMsgs[actualslot].msg;
                     dstTask = COMM;
             
-                    tcpMsgs[actualslot].msg.payload.value = !tcpMsgs[actualslot].msg.payload.value;
                     tcpMsgs[actualslot].ocupado = false; 
                     nextstate = ST_TXDATA;
                     continue;
@@ -145,7 +117,7 @@ void applicationTask(void* pvParameters) {
                     switch(msgRx.function){
 
                         case FCT_BEACON:
-                            setindpolls();
+                            // setindpolls();
                             break;
 
                         case FCT_WRITTING:
@@ -166,6 +138,7 @@ void applicationTask(void* pvParameters) {
                             // a divisao por 100 é para converter o valor inteiro de volta para float
 
                             #if DISPLAY_ENABLE
+                                Heltec.DisplayClear();
                                 sprintf(display_line3,"Leitura: %.2f",msgRx.payload.value);
                                 Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
                             #endif

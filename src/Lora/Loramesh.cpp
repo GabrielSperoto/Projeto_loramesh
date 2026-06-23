@@ -470,15 +470,11 @@ uint8_t LoRaClass::getrouteaddr(){
 }
 
 
-Node_t LoRaClass::getNodes() {
-    Node_t nodes;
-    strDevicedescription* pdd = devid;
-    
-    for(int i=0; i<sizeof(devid)/sizeof(devid[0]); i++) {
-        nodes.nodes[i] = pdd->devaddr;
-        pdd++;
-    }
-    return nodes;
+uint8_t LoRaClass::getNodes(strDevicedescription *Nodes, uint8_t numNodes) {
+    uint8_t actualNumNodes = sizeof(devid) / sizeof(devid[0]);
+    numNodes = (actualNumNodes < numNodes) ? actualNumNodes : numNodes;
+    memcpy(Nodes, devid, numNodes * sizeof(strDevicedescription));
+    return numNodes;
 }
 
 void LoRaClass::clearBuffer(uint8_t *buffer, int size)
@@ -558,7 +554,6 @@ uint32_t LoRaClass::getPayloadValue(uint8_t *packet, uint8_t len) {
   if (len > 0) {
     uint32_t value = 0;
     uint8_t* buffer = &packet[6];
-    // log_i("getPayloadValue: len=%d, buffer[0..%d]=%02x %02x %02x %02x", len, len-1, buffer[0], buffer[1], buffer[2], buffer[3]);
 
     // Monta o valor dependendo de quantos bytes chegaram
     switch (len) {
@@ -573,7 +568,7 @@ uint32_t LoRaClass::getPayloadValue(uint8_t *packet, uint8_t len) {
             break;
         case 4:
           value = (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
-        default: // Se vier mais de 4, ignora o excesso e pega os primeiros 4 bytes
+        default: 
             break;
     }
 
@@ -610,16 +605,13 @@ void LoRaClass::decodeLoraPacket(msg_t *msg){
   uint8_t *rxPacket = lastpkt.payload;
   uint8_t size = lastpkt.packetSize;
 
-  log_i("lastpkt.payload[6]: %02x", lastpkt.payload[6]);
   msg->dst = rxPacket[0];
   msg->src = rxPacket[1];
   msg->seqnum = (rxPacket[2] << 8) | rxPacket[3];
   msg->function = rxPacket[4];
 
   
-  // msg.size = rxPacket[7];
-
-  log_i("seqnum: %d",msg->seqnum);
+  
 
   if(mydd.devtype == DEV_TYPE_ROUTER){
     //pacote de respsota não possui nem o campo start nem o qtd Parametros
@@ -648,17 +640,14 @@ void LoRaClass::decodeLoraPacket(msg_t *msg){
 
             case FCT_WRITTING:
                 //aqui o end device recebe a requisição de escrita do router, entao ele deve enviar a resposta com o status da escrita
-                //log_i("Received WRITTING REQUEST from device %d", getSrcAdress());
                 // msg.size = 1;
                 msg->start = rxPacket[5];
                 msg->qtdParametros = rxPacket[6];
                 msg->size = rxPacket[7];
                 msg->payload.value = getWrittingCode();
-                log_i("Writting code: %d", msg->payload.value);
                 break;
             case FCT_DESCRIPTION:
                 //aqui o end device recebe a requisição de descrição do router, entao ele deve enviar a resposta com a descrição do dispositivo
-                //log_i("Received DESCRIPTION REQUEST from device %d", getSrcAdress());
                 break;
             default:
                 log_w("Funcao nao suportada: %d", msg->function);
@@ -693,14 +682,14 @@ uint8_t LoRaClass::encodeAndSendPacket(msg_t* message) {
     // 3. Serialização do Payload baseada na Função
     switch (message->function) {
         case FCT_BEACON:
-            // Serializa o timestamp no payload se necessário
-              buffer[pos++] = message->size; // tamanho do payload (timestamp tem 4 bytes)
-              // uint8_t* pucaux = (uint8_t*) &message->payload.value;
-              buffer[pos++] = message->payload.bytes[3]; // MSB
-              buffer[pos++] = message->payload.bytes[2];
-              buffer[pos++] = message->payload.bytes[1];
-              buffer[pos++] = message->payload.bytes[0]; // LSB
-              log_i("Encoded BEACON payload: %02X %02X %02X %02X", message->payload.bytes[3], message->payload.bytes[2], message->payload.bytes[1], message->payload.bytes[0]);
+            // // Serializa o timestamp no payload se necessário
+            //   buffer[pos++] = message->size; // tamanho do payload (timestamp tem 4 bytes)
+            //   // uint8_t* pucaux = (uint8_t*) &message->payload.value;
+            //   buffer[pos++] = message->payload.bytes[3]; // MSB
+            //   buffer[pos++] = message->payload.bytes[2];
+            //   buffer[pos++] = message->payload.bytes[1];
+            //   buffer[pos++] = message->payload.bytes[0]; // LSB
+            //   log_i("Encoded BEACON payload: %02X %02X %02X %02X", message->payload.bytes[3], message->payload.bytes[2], message->payload.bytes[1], message->payload.bytes[0]);
             break;
             
         case FCT_WRITTING:
@@ -739,9 +728,7 @@ uint8_t LoRaClass::encodeAndSendPacket(msg_t* message) {
 
     // 5. Envio físico
     if (sendPacket(buffer, pos)) {
-        log_i("Pacote enviado com sucesso, tamanho: %d", pos);
-        log_i("Buffer: %02X %02X %02X %02X %02X ...", buffer[0], buffer[1], buffer[2], buffer[3], buffer[4]);
-        // Retorna a rádio para modo de recepção, se necessário
+        
         return pos;
     }
     return 0;
@@ -814,7 +801,7 @@ bool LoRaClass::receivePacket()
             retcrc = calculate_crc((uint8_t *)lastpkt.payload,lastpkt.packetSize);
 
             
-            log_i("Rx[%d] = %02X %02X %02X %02X %02X %02X %02X",lastpkt.packetSize, dstadress, srcadress,lastpkt.payload[2],lastpkt.payload[3],fct, lastpkt.payload[lastpkt.packetSize-2], lastpkt.payload[lastpkt.packetSize-1]);
+            log_i("Rx[%d] = %02X %02X %02X %02X %02X %02X %02X",lastpkt.packetSize, dstadress, srcadress,lastpkt.payload[2],lastpkt.payload[3],fct, lastpkt.payload[lastpkt.packetSize-1]);
             // log_i("SeqNum: %d",seqnum);
             // log_i("crc: %02X", retcrc);
 

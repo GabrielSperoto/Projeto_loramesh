@@ -44,9 +44,6 @@
 
 
 
-typedef struct {
-    uint8_t nodes[10];
-} Node_t;
 
 // O __attribute__((packed)) garante que a estrutura tenha o tamanho exato dos bytes somados
 typedef struct __attribute__((packed)) {
@@ -146,7 +143,7 @@ public:
   int begin();
   void end();
   void initializeLoRa();
-  static Node_t getNodes();
+  uint8_t getNodes(strDevicedescription *Nodes, uint8_t numNodes);
 
   bool sendPacket(uint8_t *data, uint8_t len);
   
@@ -276,7 +273,6 @@ private:
   uint8_t readRegister(uint8_t address);
   void writeRegister(uint8_t address, uint8_t value);
   uint8_t singleTransfer(uint8_t address, uint8_t value);
-  
 
   SPISettings _spiSettings;
   int _ss;

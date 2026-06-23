@@ -1,5 +1,9 @@
 #include "main.h"
 
+#if defined(MOCK_TEST_MODE)
+#include "mock/Router/mockLora.h"
+#endif
+
 QueueHandle_t txQueue;    //App transmite para comunicacao
 QueueHandle_t rxQueue;    //Comunicacao responde para App
 QueueHandle_t q_tcp2app;   //Tcp transmite para app
@@ -141,11 +145,15 @@ void setup() {
     xTaskCreatePinnedToCore(CommTask, "CommTask", 3072, NULL, 3, &Send_TaskHandle, 1);
     xTaskCreatePinnedToCore(watchdogTask, "WatchdogTask", 2048, NULL, 1, &Watchdog_TaskHandle, 1);
 
-    #if 1 //tarefa é desativada para depuração
     xTaskCreatePinnedToCore(TCP_communicationTask, "TCP_CommunicationTask", 4096, NULL, 2, &TCP_Communication_TaskHandle, 1);
+
+    //tarefas de teste
+    #if defined(MOCK_ROUTER_TEST_MODE) && defined(MOCK_SEND_2_TCP)
+        xTaskCreatePinnedToCore(vTaskSend2Tcp, "MockSend2Tcp", 2048, NULL, 3, NULL, 1);
+    #elif defined(MOCK_ROUTER_TEST_MODE) && defined(MOCK_SEND_2_LORA)
+        xTaskCreatePinnedToCore(vTaskSend2Lora, "MockSend2Lora", 2048, NULL, 3, NULL, 1);
     #endif
 
-    initcomm();
     Serial.println("--- Criacao de tarefas finalizada ---\n");
 }
 

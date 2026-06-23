@@ -24,8 +24,7 @@ void reconnect();
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length);
 void SendMessage(String src, String dst, String fct, String param, String val);
 void sendRouterID();
-void disconnectedRoutine();
-void textDataManager(uint8_t * payload);
+void receiveTextData(uint8_t * payload);
 
 
 
@@ -93,13 +92,13 @@ void connectToWiFi() {
 void webSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
   switch(type) {
 		case WStype_DISCONNECTED:
-    reconnect();
+      reconnect();
     break;
 		case WStype_CONNECTED: 
-    sendRouterID();
+      sendRouterID();
     break;
 		case WStype_TEXT:
-    textDataManager(payload);
+      receiveTextData(payload);
     break;
 		case WStype_BIN:
     break;
@@ -132,14 +131,12 @@ void sendRouterID(){
     identifyMsg["src"] = String(loramesh.mydd.devserialnumber); 
     
     JsonArray nodesArray = identifyMsg.createNestedArray("nodes");
+    strDevicedescription buffer[BUFFER_SIZE];
 
-    for(uint8_t i =0; i < sizeof(loramesh.getNodes().nodes)/loramesh.getNodes().nodes[0]; i++){
-      nodesArray.add(loramesh.getNodes().nodes[i]);
+    uint8_t numNodes = loramesh.getNodes(buffer, BUFFER_SIZE);
+    for(uint8_t i =0; i < numNodes; i++){
+      nodesArray.add(buffer[i].devaddr);
     }
-    
-    // nodesArray.add(2);
-    // nodesArray.add(3);
-    // nodesArray.add(4);
 
     String json;
     serializeJson(identifyMsg, json);
@@ -150,12 +147,9 @@ void sendRouterID(){
     webSocket.sendTXT(json);
 }
 
-void disconnectedRoutine(){
-  ;
-}
 
-void textDataManager(uint8_t * payload){
-  log_i("Mensagem recebida: %s\n", payload);
+void receiveTextData(uint8_t * payload){
+  // log_i("Mensagem recebida: %s\n", payload);
 
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, payload);
@@ -165,21 +159,19 @@ void textDataManager(uint8_t * payload){
       return;
     }
 
-    const char* src = doc["dst"];
-    const char* dst = doc["src"];
+    const char* dst = doc["dst"];
     const char* fct = doc["fct"]; //associar a função (read,writting) a um codigo numérico
     const char* val = doc["val"];
     const char* param = doc["param"];
 
     //converte para byte
-    uint8_t src_addr = strtol(src, nullptr, 10);
     uint8_t dst_addr = strtol(dst, nullptr, 10);
     uint8_t function_num = strtol(fct, nullptr, 10);
     uint8_t val_num = strtol(val, nullptr, 10);
     uint8_t param_num = strtol(param, nullptr, 10);
 
 
-    msg.src = src_addr;
+    msg.src = loramesh.mydd.devaddr;
     msg.dst = dst_addr;
     msg.function = function_num;
     msg.start = param_num;
@@ -189,9 +181,10 @@ void textDataManager(uint8_t * payload){
 
 
     // xQueueSend(rxQueue, &rxMsg, 0); a mensagem é enviada pela fila q_tcp_tx
-    xQueueSend(q_tcp2app,&msg,0);
+    if(xQueueSend(q_tcp2app,&msg,0) == pdTRUE) 
+      log_i("Queue enviada. Src: %d, Dst: %d, Fct: %d, Param: %d, Val: %d", msg.src, dst_addr, function_num, param_num, msg.payload.value);
   
-    log_i("Queue enviada. Src: %d, Dst: %d, Fct: %d, Param: %d, Val: %d", src_addr, dst_addr, function_num, param_num, msg.payload.value);
+    
 }
 
 /*----------------------- Envio de resposta -----------------------*/

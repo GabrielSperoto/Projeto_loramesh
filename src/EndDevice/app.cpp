@@ -37,7 +37,7 @@ void applicationTask(void* pvParameters) {
     while (true) {
         slottimecontrol();
 
-        if(millis() - last_time >= 50){
+        if(millis() - last_time >= 500){
             last_time = millis();
             counter += 10; //simula a leitura de um valor analogico
             if (counter > 1023) counter = 0; //reseta o contador para simular a leitura de um potenciometro
@@ -45,8 +45,9 @@ void applicationTask(void* pvParameters) {
         }
 
         #if DISPLAY_ENABLE
-            sprintf(display_line2, "Leitura: %.2f V", TensaoDeSaida);
-            Heltec.DisplayShow2(display_line2);
+            Heltec.DisplayClear();
+            sprintf(display_line3, "Leitura: %.2f V", TensaoDeSaida);
+            Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
         #endif
 
         lastActivityMillis = millis();
