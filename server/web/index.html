@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard LoRa Mesh</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --bg-panel: #1e1e1e;
+            --text-main: #ffffff;
+            --text-muted: #aaaaaa;
+            --accent: #bb86fc;
+            --success: #03dac6;
+            --danger: #cf6679;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar - Lista de Dispositivos */
+        .sidebar {
+            width: 250px;
+            background-color: var(--bg-panel);
+            padding: 20px;
+            border-right: 1px solid #333;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            font-size: 1.2rem;
+            margin-top: 0;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        ul { list-style: none; padding-left: 0; }
+        .router-item { margin-bottom: 15px; }
+        .router-title { font-weight: bold; color: var(--accent); display: flex; align-items: center; }
+        .router-title::before { content: '📶'; margin-right: 8px; }
+        .node-list { padding-left: 20px; margin-top: 5px; }
+        .node-item { font-size: 0.9rem; color: var(--text-muted); padding: 3px 0; }
+        .node-item::before { content: '↳'; margin-right: 5px; }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        /* Status Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--bg-panel);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            background-color: var(--danger);
+            color: #000;
+        }
+        .status-badge.connected { background-color: var(--success); }
+
+        /* Logs de Mensagens */
+        .log-container {
+            flex: 1;
+            background-color: var(--bg-panel);
+            border-radius: 8px;
+            padding: 15px;
+            overflow-y: auto;
+            margin-bottom: 20px;
+        }
+
+        table { width: 100%; border-collapse: collapse; font-family: monospace; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #333; }
+        th { color: var(--accent); position: sticky; top: 0; background-color: var(--bg-panel); }
+        .msg-out { color: var(--success); }
+        .msg-in { color: var(--text-main); }
+
+        /* Formulário de Envio */
+        .form-container {
+            background-color: var(--bg-panel);
+            padding: 15px 20px;
+            border-radius: 8px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 5px; }
+        .form-group input {
+            background-color: #333; border: 1px solid #555;
+            color: white; padding: 8px; border-radius: 4px; width: 80px;
+        }
+        .btn-send {
+            background-color: var(--accent); color: #000;
+            border: none; padding: 10px 20px; border-radius: 4px;
+            font-weight: bold; cursor: pointer; transition: 0.2s;
+            margin-top: 18px;
+        }
+        .btn-send:hover { opacity: 0.8; }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <h2>Dispositivos Conectados</h2>
+        <div id="deviceTree">
+            <p style="color: var(--text-muted); font-size: 0.9em;">A aguardar routers...</p>
+        </div>
+    </div>
+
+    <div class="main-content">
+        
+        <div class="header">
+            <h1>Monitorização da Rede LoRa Mesh</h1>
+            <div id="connectionStatus" class="status-badge">Desconectado</div>
+        </div>
+
+        <div class="log-container">
+            <table id="logTable">
+                <thead>
+                    <tr>
+                        <th>Hora</th>
+                        <th>SRC</th>
+                        <th>DST</th>
+                        <th>FCT</th>
+                        <th>PARAM</th>
+                        <th>VAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    </tbody>
+            </table>
+        </div>
+
+        <form class="form-container" id="commandForm">
+            <div class="form-group">
+                <label>DST (Nó Destino)</label>
+                <input type="number" id="inputDst" required placeholder="Ex: 3">
+            </div>
+            <div class="form-group">
+                <label>FCT (Função)</label>
+                <input type="number" id="inputFct" required placeholder="Ex: 2">
+            </div>
+            <div class="form-group">
+                <label>PARAM</label>
+                <input type="number" id="inputParam" required placeholder="Ex: 1">
+            </div>
+            <div class="form-group">
+                <label>VAL (Valor)</label>
+                <input type="number" id="inputVal" required placeholder="Ex: 50">
+            </div>
+            <button type="submit" class="btn-send">Enviar Comando</button>
+        </form>
+
+    </div>
+
+    <script>
+        const wsUrl = "ws://localhost:8080";
+        let ws;
+
+        const statusBadge = document.getElementById('connectionStatus');
+        const deviceTree = document.getElementById('deviceTree');
+        const logTableBody = document.querySelector('#logTable tbody');
+        const commandForm = document.getElementById('commandForm');
+
+        function connect() {
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                statusBadge.textContent = "Conectado";
+                statusBadge.classList.add('connected');
+                // Enviar login da interface web
+                ws.send(JSON.stringify({ type: "login_web" }));
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                if (data.type === 'topology') {
+                    updateDeviceTree(data.data);
+                } else {
+                    // É uma mensagem de dados/comando
+                    appendLog(data);
+                }
+            };
+
+            ws.onclose = () => {
+                statusBadge.textContent = "Desconectado";
+                statusBadge.classList.remove('connected');
+                // Tentar reconectar a cada 3 segundos
+                setTimeout(connect, 3000);
+            };
+
+            ws.onerror = (err) => {
+                console.error("Erro WebSocket:", err);
+                ws.close();
+            };
+        }
+
+        function updateDeviceTree(topology) {
+            deviceTree.innerHTML = '';
+            const routers = Object.keys(topology);
+
+            if (routers.length === 0) {
+                deviceTree.innerHTML = '<p style="color: var(--text-muted); font-size: 0.9em;">Nenhum router conectado.</p>';
+                return;
+            }
+
+            const ul = document.createElement('ul');
+            routers.forEach(routerId => {
+                const li = document.createElement('li');
+                li.className = 'router-item';
+                
+                const routerTitle = document.createElement('div');
+                routerTitle.className = 'router-title';
+                routerTitle.textContent = `Router ID: ${routerId}`;
+                li.appendChild(routerTitle);
+
+                const nodes = topology[routerId];
+                if (nodes && nodes.length > 0) {
+                    const nodeUl = document.createElement('ul');
+                    nodeUl.className = 'node-list';
+                    nodes.forEach(nodeId => {
+                        const nodeLi = document.createElement('li');
+                        nodeLi.className = 'node-item';
+                        nodeLi.textContent = `Nó End-Device: ${nodeId}`;
+                        nodeUl.appendChild(nodeLi);
+                    });
+                    li.appendChild(nodeUl);
+                }
+                
+                ul.appendChild(li);
+            });
+
+            deviceTree.appendChild(ul);
+        }
+
+        function appendLog(msg) {
+            const row = document.createElement('tr');
+            
+            // Adicionar formatação de cores (se src é 100, é um comando emitido por nós)
+            if (msg.src === "100") {
+                row.classList.add('msg-out');
+            } else {
+                row.classList.add('msg-in');
+            }
+
+            const timeCell = document.createElement('td');
+            timeCell.textContent = new Date().toLocaleTimeString();
+            
+            const srcCell = document.createElement('td'); srcCell.textContent = msg.src;
+            const dstCell = document.createElement('td'); dstCell.textContent = msg.dst;
+            const fctCell = document.createElement('td'); fctCell.textContent = msg.fct;
+            const paramCell = document.createElement('td'); paramCell.textContent = msg.param;
+            const valCell = document.createElement('td'); valCell.textContent = msg.val;
+
+            row.append(timeCell, srcCell, dstCell, fctCell, paramCell, valCell);
+            logTableBody.appendChild(row);
+
+            // Auto-scroll no terminal
+            const container = document.querySelector('.log-container');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        // Submissão do Formulário
+        commandForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            if (ws.readyState !== WebSocket.OPEN) {
+                alert("O servidor WebSocket não está conectado!");
+                return;
+            }
+
+            // O SRC do servidor/aplicação web está simulado como "100" consoante as regras do requisito
+            const payload = {
+                src: "100",
+                dst: document.getElementById('inputDst').value,
+                fct: document.getElementById('inputFct').value,
+                param: document.getElementById('inputParam').value,
+                val: document.getElementById('inputVal').value
+            };
+
+            ws.send(JSON.stringify(payload));
+
+            // Limpa apenas o valor do comando para facilitar novos envios rápidos
+            document.getElementById('inputVal').value = '';
+        });
+
+        // Iniciar conexão inicial
+        connect();
+    </script>
+</body>
+</html>

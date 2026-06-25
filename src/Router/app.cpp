@@ -79,8 +79,9 @@ void applicationTask(void* pvParameters) {
                     msgTx.payload.value = 0; // timestamp zerado para verificar uma condição de overflow
 
                     #if DISPLAY_ENABLE
-                        sprintf(display_line3,"seqnum: %d",loramesh.mydd.seqnum);
-                        Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
+                        // Heltec.DisplayClear();
+                        // sprintf(display_line3,"seqnum: %d",loramesh.mydd.seqnum);
+                        // Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
                     #endif
                     nextstate = ST_TXDATA;
                     continue;
@@ -129,6 +130,7 @@ void applicationTask(void* pvParameters) {
                             }
 
                             #if DISPLAY_ENABLE
+                                Heltec.DisplayClear();
                                 sprintf(display_line3,(msgRx.payload.value == 1) ? "Escrita: Sucesso" : "Escrita: Falha");
                                 Heltec.DisplayShowAll(display_line1,display_line2,display_line3);
                             #endif
@@ -136,7 +138,6 @@ void applicationTask(void* pvParameters) {
 
                         case FCT_READING:
                             // a divisao por 100 é para converter o valor inteiro de volta para float
-
                             #if DISPLAY_ENABLE
                                 Heltec.DisplayClear();
                                 sprintf(display_line3,"Leitura: %.2f",msgRx.payload.value);
