@@ -39,36 +39,50 @@
 #define RF_PADAC_20DBM_ON                           0x07
 #define RF_PADAC_20DBM_OFF                          0x04  // Default
 
+#define POLYNOMIAL_CRC 0x1021                       // Define o polinômio para o cálculo do CRC-16-CCITT
 
-void LoraSendFrame(String data,size_t len);
-uint8_t LoraReceiveFrame(char *pframe);
 
-typedef struct {
-    uint8_t srcaddress;
-    uint8_t dstaddress;
-    uint8_t fct;
-    uint16_t seqnum=0;
-    // uint32_t timestamp;
-    uint8_t packetSize;
-    uint8_t rxpacket[BUFFER_SIZE];
+// O __attribute__((packed)) garante que a estrutura tenha o tamanho exato dos bytes somados
+typedef struct __attribute__((packed)) {
+    uint8_t  packetSize;
+    uint8_t  payload[BUFFER_SIZE]; // Troquei de rxpacket para payload
 } strPacket;
 
+typedef enum {
+    TCP,
+    APP,
+    COMM
+} task_t;
+
+typedef union {
+    uint8_t bytes[4];
+    uint32_t value;
+} payload_t;
+
+typedef struct{
+    uint8_t dst;
+    uint8_t src;
+    uint16_t seqnum;
+    uint8_t function;
+    uint8_t start;
+    uint8_t qtdParametros; //start e qtdParametros fazem parte do pacote de requisição 
+    uint8_t size;
+    payload_t payload; //valor usado na escrita ou leitura
+} msg_t;
+
+typedef struct {
+    msg_t msg;
+    uint8_t ocupado; //flag para indicar se a estrutura está ocupada ou não
+} tcpMsgs_t;
 
 typedef struct  {
     uint16_t devserialnumber;
     uint8_t  devtype;
     uint8_t  devaddr;
     uint8_t  dataslot;
-    uint16_t  seqnum;
+    uint16_t seqnum;
 } strDevicedescription;
 
-// Fila para armazenar mensagens recebidas
-//estrutura não utilizada no código
-// typedef struct {
-//     uint8_t buffer[BUFFER_SIZE];
-//     uint8_t length;
-//     uint8_t slot;
-// } RxMessage;
 
 typedef enum {
    DEV_TYPE_ROUTER=1,
@@ -77,23 +91,28 @@ typedef enum {
 
 typedef enum {
    FCT_BEACON=1,
-   FCT_JOIN,
-   FCT_SYNC_SUCESS, // achei um nome mais adequado para um resposta de beacon
+   FCT_JOIN, 
    FCT_DESCRIPTION,
    FCT_READING,
-   FCT_WRITING
+   FCT_WRITTING,
+   FCT_TXDONE
 } functioncode;
 
 typedef enum  {
     ST_TXBEACON,
-    ST_RXWAIT,
-    ST_RXDONE,
-    ST_TXDATA,
-    ST_STANDBY,
-    ST_TXREQUEST,
     ST_STARTRX,
-    ST_RXRESPONSE
+    ST_RXWAIT,
+    ST_STARTTX,
+    ST_TXDATA,
+    ST_WAITTXDONE,
+    ST_STANDBY
 }statemac;
+
+//paremtros disponiveis
+typedef enum{
+    LEDP = 1,
+    POT = 2
+}parametercode;
 
 #if defined (__STM32F1__)
 inline unsigned char  digitalPinToInterrupt(unsigned char Interrupt_pin) { return Interrupt_pin; } //This isn't included in the stm32duino libs (yet)
@@ -113,6 +132,7 @@ class LoRaClass : public Stream {
 public:
   strDevicedescription mydd;
   strPacket lastpkt;
+  msg_t msg;
 
   LoRaClass();
 
@@ -120,6 +140,7 @@ public:
   int begin();
   void end();
   void initializeLoRa();
+  uint8_t getNodes(strDevicedescription *Nodes, uint8_t numNodes);
 
   bool sendPacket(uint8_t *data, uint8_t len);
   
@@ -130,29 +151,33 @@ public:
   int startReceiving(uint32_t timeout);
   
 
-  uint8_t sendPacketReq(uint8_t dst, uint8_t fct, uint8_t start, uint8_t qtdParametros);
-  uint8_t sendBeacon(long timestamp);
-  uint8_t sendBeacontRes(uint8_t dstaddr); //envio de uma resposta de beacon
-  uint8_t sendReadingReq(uint8_t dstaddr,uint8_t start, uint8_t qtdParametros);
-  uint8_t sendReadingRes(uint8_t dst, uint8_t size, uint8_t *buf); //envio de uma resposta de leitura
-  uint8_t sendWrittingReq(uint8_t dst, uint8_t start, uint8_t qtdParametros, uint8_t value); 
-  uint8_t sendWrittingRes(uint8_t dst, uint8_t status);
+  void decodeLoraPacket(msg_t *msg);
+  uint8_t encodeAndSendPacket(msg_t *msg);
 
 
   void setDioActionsForReceivePacket(void);
   void clearDioActions(void);
   void onReceive(void);
+  
   uint8_t getrouteaddr(void);
-  uint8_t checkcrc (uint8_t *packet, uint8_t len);
-  uint8_t getaddress(uint8_t *packet,uint8_t len);
-  uint32_t gettimestamp(uint8_t *packet,uint8_t len);
-  uint8_t getfunction(uint8_t *packet,uint8_t len);
+  uint16_t calculate_crc (uint8_t *packet, uint8_t len);
+//   uint8_t getaddress(uint8_t *packet,uint8_t len);
+//   uint32_t gettimestamp(uint8_t *packet,uint8_t len);
+//   uint8_t getfunction(uint8_t *packet,uint8_t len);
   uint16_t getseqnum(uint8_t *packet,uint8_t len);
   uint16_t getLastSeqNum(void);
   uint16_t getLastPctSeqNum(void);
-  uint8_t getResponseStatus(void);
-  uint32_t getReadingDataAsUint32(void); // obtem o valor de leitura
+//   uint8_t getResponseStatus(void);
+  uint32_t getPayloadValue(uint8_t *packet, uint8_t len); // obtem o valor de leitura
   uint8_t getWrittingCode(void);
+
+//   uint8_t getSrcAdress();
+//   uint8_t getFunctionCode();
+  uint8_t getStart();
+  uint8_t getQtdParametros();
+  uint8_t getSizeMsg();
+
+
  
 
   void clearBuffer(uint8_t *buffer, int size);
@@ -245,7 +270,6 @@ private:
   uint8_t readRegister(uint8_t address);
   void writeRegister(uint8_t address, uint8_t value);
   uint8_t singleTransfer(uint8_t address, uint8_t value);
-  
 
   SPISettings _spiSettings;
   int _ss;

@@ -1,4 +1,4 @@
-
+// Biblioteca adaptada da Heltec
 
 #ifndef _HELTEC_H_
 #define _HELTEC_H_
@@ -8,7 +8,7 @@
 #include <Arduino.h>
 #if defined( WIFI_Kit_32 ) || defined( WIFI_LoRa_32 ) || defined( WIFI_LoRa_32_V2 ) || defined( WIFI_LoRa_32_V3 ) || defined( Wireless_Stick ) 
 #include <Wire.h>
-#include "oled/SSD1306Wire.h"
+#include "OLED/SSD1306Wire.h"
 #endif
 
 #if defined( WIFI_LoRa_32 ) || defined( WIFI_LoRa_32_V2 ) || defined( WIFI_LoRa_32_V3 ) || defined( Wireless_Stick ) || defined( Wireless_Stick_Lite ) || defined( Wireless_Bridge )

@@ -1,4 +1,6 @@
-#ifndef _DEVCONFIG_H_
+// Arquivo de configuração do sistema
+
+#ifndef _DEVCONFIG_H_ // Se o arquivo ainda não tiver sido condigurado, entra nessa condição
 #define _DEVCONFIG_H_
 
 //Suport Heltec V2 and V3 
@@ -35,18 +37,19 @@
 #define SYNC_P     0b01000010
 #define LOG_LOCAL_LEVEL CONFIG_LOG_MAXIMUM_LEVEL
  
-//#define RX_TIMEOUT_VALUE   1000
+#define RX_ROUTER_TIMEOUT 1000
+#define RX_ENDDEV_TIMEOUT 2000
 
 //#define MINIMUM_DELAY 900 
 
 #define MAX_ADDR 5
 #define BROADCAST_ADDR 0
-#define BYTE_CRC 0x66
+#define POLYNOMIAL_CRC 0x1021                       // Define o polinômio para o cálculo do CRC-16-CCITT
 
 #define MAX_PACKET_SIZE  30
 
 #define MAX_SLOTS   5
-#define BEACON_SLOT 0 
+#define BEACON_SLOT 0
 
 //Intervalo entre os envios
 #define SLOT_INTERVAL 1000
@@ -57,7 +60,7 @@
    goes from 7 to 12 where SF7 is the shortest and SF12 the longest */
 // Number from 5 to 12. Higher means slower but higher "processor gain",
 
-#define LORA_SF 11
+#define LORA_SF 11 // Spreading factor
 
 /*Frequency for lora
    434.0 MHz (default) 
@@ -75,7 +78,7 @@
 // LoRa bandwidth. Keep the decimal point to designate float.
 // Allowed values are 7.8, 10.4, 15.6, 20.8, 31.25, 41.7, 62.5, 125.0, 250.0 and 500.0 kHz.
 
-#define LORA_BW 125.0
+#define LORA_BW 125.0 // Largura de banda
 
 
 /* Output power in dBm. 
